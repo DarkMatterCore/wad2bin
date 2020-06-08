@@ -1,0 +1,9 @@
+/config.mk
+/wad2cntbin
+/wad2cntbin.exe
+*.o
+*.so
+*.so.*
+*.a
+*.dll
+*.lib
