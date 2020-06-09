@@ -50,4 +50,9 @@ void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
+
+
+
+
+
 #endif /* __UTILS_H__ */

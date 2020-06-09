@@ -28,14 +28,16 @@
 #include <mbedtls/sha1.h>
 #include <mbedtls/md5.h>
 
-#include <ninty-233.h>
-
 #define SHA1_HASH_SIZE      20
 
 #define MD5_HASH_SIZE       16
 
 #define AES_BLOCK_SIZE      16
 #define AES_BLOCK_SIZE_BITS (AES_BLOCK_SIZE * 8)
+
+#define ECC_PRIV_KEY_SIZE   32
+#define ECC_PUB_KEY_SIZE    64
+#define ECSDA_SIG_SIZE      64
 
 /// Used to hold AES-128-CBC crypto status.
 typedef struct {
@@ -48,5 +50,13 @@ bool cryptoAes128CbcCreateContext(CryptoAes128CbcContext *ctx, const void *key, 
 void cryptoAes128CbcFreeContext(CryptoAes128CbcContext *ctx);
 void cryptoAes128CbcResetContextIv(CryptoAes128CbcContext *ctx, const void *iv);
 bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt);
+
+/// Generates an ECSDA signature using the provided ECC private key.
+/// Takes care of handling key/signature padding when needed. If unpadded_sig is true, the output signature won't include two 0x00 bytes before each coordinate.
+void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool unpadded_sig);
+
+/// Generates an ECC public key using the provided ECC private key.
+/// Takes care of handling key padding when needed. The generated key can be used in AP certificates.
+void cryptoGenerateEccPublicKey(const void *private_key, void *dst);
 
 #endif /* __CRYPTO_H__ */

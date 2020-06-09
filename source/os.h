@@ -36,6 +36,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifndef MAX_PATH
+#define MAX_PATH    1024
+#endif
+
 #define IS_BIG_ENDIAN   (*((u16*)"\0\xff") < 0x100)
 
 #define bswap_16(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap16(val))

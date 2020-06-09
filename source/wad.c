@@ -51,18 +51,9 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     u16 content_count = 0;
     
     FILE *entry_fd = NULL;
+    os_char_t entry_path[MAX_PATH] = {0};
     
     bool success = false;
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     /* Create output directory. */
     if (os_mkdir(out_dir, 0777) < 0)

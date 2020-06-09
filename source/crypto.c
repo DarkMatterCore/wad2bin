@@ -19,6 +19,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ninty-233.h>
+
 #include "utils.h"
 #include "crypto.h"
 
@@ -82,4 +84,82 @@ bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *sr
     if (ret != 0) ERROR_MSG("AES %s failed! (%d).", (encrypt ? "encryption" : "decryption"), ret);
     
     return (ret == 0);
+}
+
+void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool unpadded_sig)
+{
+    if (!private_key || !dst || !src || !size) return;
+    
+    element priv_key = {0}, r = {0}, s = {0};
+    u8 padded_priv_key[ECC_PRIV_KEY_SIZE] = {0};
+    
+    u8 full_sig[ECSDA_SIG_SIZE] = {0};
+    
+    mpz_t hash = {0};
+    u8 *dst_u8 = (u8*)dst;
+    
+    /* Generate padded ECC private key. */
+    /* Wii ECC private keys are 30 bytes long. */
+    memcpy(padded_priv_key + 2, private_key, ECC_PRIV_KEY_SIZE - 2);
+    
+    /* Convert private key to a GF(2^m) element. */
+    os_to_elem(padded_priv_key, priv_key);
+    
+    /* Calculate SHA-1 hash over source data. */
+    mpz_init(hash);
+    sha1((const u8*)src, size, NOT_IQUE_HASH, hash);
+    
+    /* Generate ECSDA signature. */
+    ecdsa_sign(hash, priv_key, r, s);
+    mpz_clear(hash);
+    
+    /* Convert ECSDA signature to byte stream. */
+    elem_to_os(r, full_sig);
+    elem_to_os(s, full_sig + 32);
+    
+    if (unpadded_sig)
+    {
+        /* Generate unpadded ECSDA signature. */
+        /* Wii ECSDA signatures are normally 60 bytes long. */
+        memcpy(dst_u8, full_sig + 2, 30);
+        memcpy(dst_u8 + 30, full_sig + 34, 30);
+    } else {
+        /* Copy ECSDA signature as-is. */
+        memcpy(dst_u8, full_sig, ECSDA_SIG_SIZE);
+    }
+}
+
+void cryptoGenerateEccPublicKey(const void *private_key, void *dst)
+{
+    if (!private_key || !dst) return;
+    
+    element priv_key = {0};
+    u8 padded_priv_key[ECC_PRIV_KEY_SIZE] = {0};
+    
+    ec_point G = {0}, shared_secret = {0};
+    u8 full_pub_key[ECC_PUB_KEY_SIZE] = {0};
+    
+    u8 *dst_u8 = (u8*)dst;
+    
+    /* Generate padded ECC private key. */
+    /* Wii ECC private keys are 30 bytes long. */
+    memcpy(padded_priv_key + 2, private_key, ECC_PRIV_KEY_SIZE - 2);
+    
+    /* Convert private key to a GF(2^m) element. */
+    os_to_elem(padded_priv_key, priv_key);
+    
+    /* Copy ECC-B233 base point. */
+    gf2m_copy(G_X, G.x);
+    gf2m_copy(G_Y, G.y);
+    
+    /* Generate ECDH shared secret. This will serve as our ECC public key. */
+    ec_point_mul(priv_key, &G, &shared_secret);
+    
+    /* Convert ECC public key to byte stream. */
+    point_to_os(&shared_secret, full_pub_key);
+    
+    /* Generate unpadded ECC public key. */
+    /* Wii ECC public keys are normally 60 bytes long. */
+    memcpy(dst_u8, full_pub_key + 2, 30);
+    memcpy(dst_u8 + 30, full_pub_key + 34, 30);
 }
