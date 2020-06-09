@@ -26,7 +26,6 @@
 
 #include "signature.h"
 
-#define CERT_MAX_SIZE   0x500   /* Equivalent to sizeof(CertSigRsa4096PubKeyRsa4096) */
 #define CERT_MIN_SIZE   0x140   /* Equivalent to sizeof(CertSigHmac160PubKeyEcc480) */
 
 typedef enum {
@@ -153,7 +152,7 @@ typedef struct {
 /// Returns false if an error occurs.
 bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
 
-/// Reads a raw certificate chain from a file and verifies all signature and public key sizes.
+/// Reads a raw certificate chain from a file and validates all signature and public key sizes.
 u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size);
 
 /// Returns a pointer to the common certificate block from a certificate stored in a memory buffer.

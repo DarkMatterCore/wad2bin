@@ -36,6 +36,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define IS_BIG_ENDIAN   (*((u16*)"\0\xff") < 0x100)
+
+#define bswap_16(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap16(val))
+#define bswap_32(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap32(val))
+#define bswap_64(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap64(val))
+
 #ifdef _WIN32
 typedef wchar_t os_char_t;   /// UTF-16.
 typedef _WDIR os_dir_t;

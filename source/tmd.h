@@ -25,9 +25,12 @@
 #define __TMD_H__
 
 #include "signature.h"
+#include "crypto.h"
 
-#define TMD_MAX_SIZE    0x   /* Equivalent to sizeof(TmdSigRsa2048) */
-#define TMD_MIN_SIZE    0x   /* Equivalent to sizeof(TmdSigHmac160) */
+#define TMD_MIN_SIZE                0x108   /* Equivalent to sizeof(TmdSigHmac160) + sizeof(TmdContentRecord) */
+#define TMD_MAX_CONTENT_COUNT       512
+#define TMD_COMMON_BLOCK_SIZE(x)    (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
+#define TMD_CONTENTS(x)             ((TmdContentRecord*)(((u8*)(x)) + sizeof(TmdCommonBlock)))
 
 typedef enum {
     TmdType_None        = 0,
@@ -36,13 +39,6 @@ typedef enum {
     TmdType_SigEcc480   = 3,
     TmdType_SigHmac160  = 4
 } TmdType;
-
-
-
-
-
-
-
 
 typedef enum {
     TmdTargetSystem_Normal = 0,
@@ -58,7 +54,24 @@ typedef enum {
     TmdTitleType_CT           = 0x40
 } TmdTitleType;
 
+typedef enum {
+    TmdAccessRights_FullHardware   = BIT(0),
+    TmdAccessRights_DriveInterface = BIT(1)
+} TmdAccessRights;
 
+typedef enum {
+    TmdContentRecordType_Normal = 0x0001,
+    TmdContentRecordType_DLC    = 0x4001,
+    TmdContentRecordType_Shared = 0x8001
+} TmdContentRecordType;
+
+typedef struct {
+    u32 content_id;
+    u16 index;
+    u16 type;                   ///< TmdContentRecordType.
+    u64 size;
+    u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
+} TmdContentRecord;
 
 /// Placed after the ticket signature block.
 typedef struct {
@@ -70,51 +83,55 @@ typedef struct {
     u64 title_id;           ///< Title ID.
     u32 title_type;         ///< TmdTitleType.
     char group_id[0x02];    ///< Publisher.
-    u8 reserved[0x02];
-    
+    u8 reserved_1[0x02];
+    u16 region;
+    u8 ratings[0x10];
+    u8 reserved_2[0x0C];
+    u8 ipc_mask[0x0C];
+    u8 reserved_3[0x12];
+    u32 access_rights;      ///< TmdAccessRights.
+    u16 title_version;
+    u16 content_count;
+    u16 boot_index;
+    u8 reserved_4[0x02];
 } TmdCommonBlock;
-
-
-
-
-
 
 typedef struct {
     SignatureBlockRsa4096 sig_block;    ///< sig_type field is stored using big endian byte order.
-    TikCommonBlock tik_common_block;
-} TikSigRsa4096;
+    TmdCommonBlock tmd_common_block;
+} TmdSigRsa4096;
 
 typedef struct {
     SignatureBlockRsa2048 sig_block;    ///< sig_type field is stored using big endian byte order.
-    TikCommonBlock tik_common_block;
-} TikSigRsa2048;
+    TmdCommonBlock tmd_common_block;
+} TmdSigRsa2048;
 
 typedef struct {
     SignatureBlockEcc480 sig_block;    ///< sig_type field is stored using big endian byte order.
-    TikCommonBlock tik_common_block;
-} TikSigEcc480;
+    TmdCommonBlock tmd_common_block;
+} TmdSigEcc480;
 
 typedef struct {
     SignatureBlockHmac160 sig_block;    ///< sig_type field is stored using big endian byte order.
-    TikCommonBlock tik_common_block;
-} TikSigHmac160;
+    TmdCommonBlock tmd_common_block;
+} TmdSigHmac160;
 
-/// Determines if a buffer holds a valid ticket and saves its type and size to the input pointers.
+/// Determines if a buffer holds a valid TMD and saves its type and size to the input pointers.
 /// out_type and out_size can be NULL, but at least one of them must be a valid pointer.
 /// Returns false if an error occurs.
-bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, u64 *out_size);
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
 
-/// Reads a ticket from a file and verifies its signature size.
-u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size);
+/// Reads a TMD from a file and validates its signature size.
+u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size);
 
-/// Returns a pointer to the common ticket block from a ticket stored in a memory buffer.
-/// Optionally, it also saves the ticket type to an input pointer if provided.
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_ticket_type);
+/// Returns a pointer to the common TMD block from a TMD stored in a memory buffer.
+/// Optionally, it also saves the TMD type to an input pointer if provided.
+TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_tmd_type);
 
-/// Checks the Title ID from a common ticket block to determine if the title is exportable.
-bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
+/// Check the system version field from a common TMD block to determine if it references an IOS version.
+bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block);
 
-/// Fakesigns a ticket stored in a buffer.
-void tikFakesignTicket(void *buf, size_t buf_size);
+/// Fakesigns a TMD stored in a buffer.
+void tmdFakesignTitleMetadata(void *buf, size_t buf_size);
 
-#endif /* __TIK_H__ */
+#endif /* __TMD_H__ */

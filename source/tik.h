@@ -26,7 +26,6 @@
 
 #include "signature.h"
 
-#define TIK_MAX_SIZE    0x3A4   /* Equivalent to sizeof(TikSigRsa2048) */
 #define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160) */
 
 typedef enum {
@@ -97,9 +96,9 @@ typedef struct {
 /// Determines if a buffer holds a valid ticket and saves its type and size to the input pointers.
 /// out_type and out_size can be NULL, but at least one of them must be a valid pointer.
 /// Returns false if an error occurs.
-bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, u64 *out_size);
+bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
 
-/// Reads a ticket from a file and verifies its signature size.
+/// Reads a ticket from a file and validates its signature size.
 u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size);
 
 /// Returns a pointer to the common ticket block from a ticket stored in a memory buffer.

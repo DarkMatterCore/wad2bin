@@ -42,16 +42,15 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     
     u8 *ticket = NULL;
     TikCommonBlock *tik_common_block = NULL;
+    TmdContentRecord *tmd_contents = NULL;
     
     u8 *tmd = NULL;
+    TmdCommonBlock *tmd_common_block = NULL;
     
+    u64 tik_tid = 0, tmd_tid = 0;
+    u16 content_count = 0;
     
-    
-    
-    
-    
-    FILE *cnt_fd = NULL;
-    
+    FILE *entry_fd = NULL;
     
     bool success = false;
     
@@ -149,9 +148,53 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     wad_offset += ALIGN_UP(wad_header.ticket_size, 0x40);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
+    /* Read TMD. */
+    tmd = tmdReadTitleMetadataFromFile(wad_fd, wad_header.tmd_size);
+    if (!tmd)
+    {
+        ERROR_MSG("Invalid TMD in \"" OS_PRINT_STR "\"!", wad_path);
+        goto out;
+    }
+    
+    /* Check if the TMD system version field is valid. */
+    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, wad_header.tmd_size, NULL);
+    if (!tmdIsSystemVersionValid(tmd_common_block))
+    {
+        ERROR_MSG("Invalid TMD system version field!\nThis is probably an IOS / boot2 WAD package!");
+        goto out;
+    }
+    
+    /* Compare ticket and TMD title IDs. */
+    tik_tid = bswap_64(tik_common_block->title_id);
+    tmd_tid = bswap_64(tmd_common_block->title_id);
+    if (tik_tid != tmd_tid)
+    {
+        ERROR_MSG("Ticket/TMD Title ID mismatch! (%08" PRIx32 "-%08" PRIx32 " != %08" PRIx32 "-%08" PRIx32 ").", TITLE_UPPER(tik_tid), TITLE_LOWER(tik_tid), TITLE_UPPER(tmd_tid), TITLE_LOWER(tmd_tid));
+        goto out;
+    }
+    
+    /* Update file stream position. */
+    wad_offset += ALIGN_UP(wad_header.tmd_size, 0x40);
+    os_fseek(wad_fd, wad_offset, SEEK_SET);
+    
+    /* Process content files. */
+    content_count = bswap_16(tmd_common_block->content_count);
+    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    
+    for(u16 i = 0; i < content_count; i++)
+    {
+        
+        
+        
+        
+        
+    }
     
     
     
+    
+    
+
     
     
     

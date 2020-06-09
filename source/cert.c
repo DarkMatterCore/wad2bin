@@ -39,7 +39,7 @@ bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_typ
     u32 sig_type = 0, pub_key_type = 0;
     
     memcpy(&sig_type, buf_u8, sizeof(u32));
-    sig_type = __builtin_bswap32(sig_type);
+    sig_type = bswap_32(sig_type);
     
     switch(sig_type)
     {
@@ -64,7 +64,7 @@ bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_typ
     }
     
     memcpy(&pub_key_type, buf_u8 + offset, sizeof(u32));
-    pub_key_type = __builtin_bswap32(pub_key_type);
+    pub_key_type = bswap_32(pub_key_type);
     
     offset += MEMBER_SIZE(CertCommonBlock, pub_key_type);
     offset += MEMBER_SIZE(CertCommonBlock, name);

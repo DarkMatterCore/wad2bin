@@ -40,7 +40,7 @@ typedef enum {
     WadVersion_BackupPackage      = 1   ///< Used with Backup WAD packages.
 } WadVersion;
 
-///< Used with installable WAD packages.
+/// Used with installable WAD packages.
 typedef struct {
     u32 header_size;        ///< WadHeaderSize_InstallablePackage.
     u16 type;               ///< WadType_NormalPackage or WadType_Boot2Package.
@@ -53,7 +53,7 @@ typedef struct {
     u32 footer_size;        ///< Decrypted footer size.
 } WadInstallablePackageHeader;
 
-///< Used with both data.bin and content.bin files.
+/// Used with both data.bin and content.bin files.
 typedef struct {
     u32 header_size;            ///< WadHeaderSize_BackupPackage.
     u16 type;                   ///< WadType_BackupPackage.
@@ -80,14 +80,14 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
 ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePackageHeader *wad_header)
 {
     if (!wad_header) return;
-    wad_header->header_size = __builtin_bswap32(wad_header->header_size);
-    wad_header->type = __builtin_bswap16(wad_header->type);
-    wad_header->version = __builtin_bswap16(wad_header->version);
-    wad_header->cert_chain_size = __builtin_bswap32(wad_header->cert_chain_size);
-    wad_header->ticket_size = __builtin_bswap32(wad_header->ticket_size);
-    wad_header->tmd_size = __builtin_bswap32(wad_header->tmd_size);
-    wad_header->data_size = __builtin_bswap32(wad_header->data_size);
-    wad_header->footer_size = __builtin_bswap32(wad_header->footer_size);
+    wad_header->header_size = bswap_32(wad_header->header_size);
+    wad_header->type = bswap_16(wad_header->type);
+    wad_header->version = bswap_16(wad_header->version);
+    wad_header->cert_chain_size = bswap_32(wad_header->cert_chain_size);
+    wad_header->ticket_size = bswap_32(wad_header->ticket_size);
+    wad_header->tmd_size = bswap_32(wad_header->tmd_size);
+    wad_header->data_size = bswap_32(wad_header->data_size);
+    wad_header->footer_size = bswap_32(wad_header->footer_size);
 }
 
 

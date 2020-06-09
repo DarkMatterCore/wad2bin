@@ -1,5 +1,5 @@
 /*
- * tik.c
+ * tmd.c
  *
  * Copyright (c) 2020, DarkMatterCore <pabloacurielz@gmail.com>.
  *
@@ -20,12 +20,11 @@
  */
 
 #include "utils.h"
-#include "tik.h"
-#include "crypto.h"
+#include "tmd.h"
 
-bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size)
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size)
 {
-    if (!buf || buf_size < TIK_MIN_SIZE || (!out_type && !out_size))
+    if (!buf || buf_size < TMD_MIN_SIZE || (!out_type && !out_size))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
@@ -33,8 +32,9 @@ bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, siz
     
     u32 sig_type = 0;
     size_t offset = 0;
-    u8 type = TikType_None;
+    u8 type = TmdType_None;
     const u8 *buf_u8 = (const u8*)buf;
+    const TmdCommonBlock *tmd_common_block = NULL;
     
     memcpy(&sig_type, buf_u8, sizeof(u32));
     
@@ -42,21 +42,21 @@ bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, siz
     {
         case SignatureType_Rsa4096Sha1:
         case SignatureType_Rsa4096Sha256:
-            type = TikType_SigRsa4096;
+            type = TmdType_SigRsa4096;
             offset += sizeof(SignatureBlockRsa4096);
             break;
         case SignatureType_Rsa2048Sha1:
         case SignatureType_Rsa2048Sha256:
-            type = TikType_SigRsa2048;
+            type = TmdType_SigRsa2048;
             offset += sizeof(SignatureBlockRsa2048);
             break;
         case SignatureType_Ecc480Sha1:
         case SignatureType_Ecc480Sha256:
-            type = TikType_SigEcc480;
+            type = TmdType_SigEcc480;
             offset += sizeof(SignatureBlockEcc480);
             break;
         case SignatureType_Hmac160Sha1:
-            type = TikType_SigHmac160;
+            type = TmdType_SigHmac160;
             offset += sizeof(SignatureBlockHmac160);
             break;
         default:
@@ -64,11 +64,21 @@ bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, siz
             return false;
     }
     
-    offset += sizeof(TikCommonBlock);
+    tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
+    offset += sizeof(TmdCommonBlock);
     
+    /* Retrieve content count. */
+    u16 content_count = bswap_16(tmd_common_block->content_count);
+    if (!content_count || content_count > TMD_MAX_CONTENT_COUNT)
+    {
+        ERROR_MSG("Invalid TMD content count!");
+        return false;
+    }
+    
+    offset += (content_count * sizeof(TmdContentRecord));
     if (offset > buf_size)
     {
-        ERROR_MSG("Calculated end offset exceeds certificate buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
+        ERROR_MSG("Calculated end offset exceeds TMD buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
         return false;
     }
     
@@ -78,145 +88,151 @@ bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, siz
     return true;
 }
 
-u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
+u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
 {
-    if (!fd || ticket_size < TIK_MIN_SIZE)
+    if (!fd || tmd_size < TMD_MIN_SIZE)
     {
         ERROR_MSG("Invalid parameters!");
         return NULL;
     }
     
-    u8 *ticket = NULL;
+    u8 *tmd = NULL;
     size_t res = 0;
     
-    u8 ticket_type = 0;
-    size_t ticket_detected_size = 0;
+    u8 tmd_type = 0;
+    size_t tmd_detected_size = 0;
     
     bool success = false;
     
-    /* Allocate memory for the ticket. */
-    ticket = malloc(ticket_size);
-    if (!ticket)
+    /* Allocate memory for the TMD. */
+    tmd = malloc(tmd_size);
+    if (!tmd)
     {
-        ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes ticket buffer!", ticket_size);
+        ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes TMD buffer!", tmd_size);
         return NULL;
     }
     
-    /* Read ticket. */
-    res = fread(ticket, 1, ticket_size, fd);
-    if (res != ticket_size)
+    /* Read TMD. */
+    res = fread(tmd, 1, tmd_size, fd);
+    if (res != tmd_size)
     {
-        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long ticket!", ticket_size);
+        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long TMD!", tmd_size);
         goto out;
     }
     
-    /* Check if the ticket size is valid. */
-    if (!tikGetTicketTypeAndSize(ticket, ticket_size, &ticket_type, &ticket_detected_size) || ticket_size != ticket_detected_size)
+    /* Check if the TMD size is valid. */
+    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size) || tmd_size != tmd_detected_size)
     {
-        ERROR_MSG("Invalid ticket!");
+        ERROR_MSG("Invalid TMD!");
         goto out;
     }
     
     success = true;
     
 out:
-    if (!success && ticket)
+    if (!success && tmd)
     {
-        free(ticket);
-        ticket = NULL;
+        free(tmd);
+        tmd = NULL;
     }
     
-    return ticket;
+    return tmd;
 }
 
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_ticket_type)
+TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_tmd_type)
 {
-    if (!buf || buf_size < TIK_MIN_SIZE)
+    if (!buf || buf_size < TMD_MIN_SIZE)
     {
         ERROR_MSG("Invalid parameters!");
         return NULL;
     }
     
-    u8 ticket_type = 0;
+    u8 tmd_type = 0;
     u8 *buf_u8 = (u8*)buf;
-    TikCommonBlock *tik_common_block = NULL;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!tikGetTicketTypeAndSize(buf, buf_size, &ticket_type, NULL))
+    if (!tmdGetTitleMetadataTypeAndSize(buf, buf_size, &tmd_type, NULL))
     {
-        ERROR_MSG("Invalid ticket!");
+        ERROR_MSG("Invalid TMD!");
         return NULL;
     }
     
-    switch(ticket_type)
+    switch(tmd_type)
     {
-        case TikType_SigRsa4096:
-            tik_common_block = (TikCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa4096));
+        case TmdType_SigRsa4096:
+            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa4096));
             break;
-        case TikType_SigRsa2048:
-            tik_common_block = (TikCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa2048));
+        case TmdType_SigRsa2048:
+            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa2048));
             break;
-        case TikType_SigEcc480:
-            tik_common_block = (TikCommonBlock*)(buf_u8 + sizeof(SignatureBlockEcc480));
+        case TmdType_SigEcc480:
+            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockEcc480));
             break;
-        case TikType_SigHmac160:
-            tik_common_block = (TikCommonBlock*)(buf_u8 + sizeof(SignatureBlockHmac160));
+        case TmdType_SigHmac160:
+            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockHmac160));
             break;
         default:
-            ERROR_MSG("Invalid ticket type value!");
+            ERROR_MSG("Invalid TMD type value!");
             break;
     }
     
-    if (tik_common_block && out_ticket_type) *out_ticket_type = ticket_type;
+    if (tmd_common_block && out_tmd_type) *out_tmd_type = tmd_type;
     
-    return tik_common_block;
+    return tmd_common_block;
 }
 
-bool tikIsTitleExportable(TikCommonBlock *tik_common_block)
+bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block)
 {
-    if (!tik_common_block)
+    if (!tmd_common_block)
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 title_id = bswap_64(tik_common_block->title_id);
+    u64 title_id = bswap_64(tmd_common_block->system_version);
     u32 tid_upper = TITLE_UPPER(title_id);
     
-    return (tid_upper == TITLE_TYPE_DOWNLOADABLE_CHANNEL || tid_upper == TITLE_TYPE_DISC_BASED_CHANNEL || tid_upper == TITLE_TYPE_DLC);
+    if (tid_upper != TITLE_TYPE_SYSTEM)
+    {
+        ERROR_MSG("TMD system version doesn't reference an IOS version!");
+        return false;
+    }
+    
+    return true;
 }
 
-void tikFakesignTicket(void *buf, size_t buf_size)
+void tmdFakesignTitleMetadata(void *buf, size_t buf_size)
 {
-    if (!buf || buf_size < TIK_MIN_SIZE) return;
+    if (!buf || buf_size < TMD_MIN_SIZE) return;
     
-    u8 ticket_type = 0;
-    TikCommonBlock *tik_common_block = NULL;
+    u8 tmd_type = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    tik_common_block = tikGetCommonBlockFromBuffer(buf, buf_size, &ticket_type);
-    if (!tik_common_block) return;
+    tmd_common_block = tmdGetCommonBlockFromBuffer(buf, buf_size, &tmd_type);
+    if (!tmd_common_block) return;
     
     /* Wipe signature. */
-    switch(ticket_type)
+    switch(tmd_type)
     {
-        case TikType_SigRsa4096:
+        case TmdType_SigRsa4096:
         {
             SignatureBlockRsa4096 *sig_rsa_4096 = (SignatureBlockRsa4096*)buf;
             memset(sig_rsa_4096->signature, 0, sizeof(sig_rsa_4096->signature));
             break;
         }
-        case TikType_SigRsa2048:
+        case TmdType_SigRsa2048:
         {
             SignatureBlockRsa2048 *sig_rsa_2048 = (SignatureBlockRsa2048*)buf;
             memset(sig_rsa_2048->signature, 0, sizeof(sig_rsa_2048->signature));
             break;
         }
-        case TikType_SigEcc480:
+        case TmdType_SigEcc480:
         {
             SignatureBlockEcc480 *sig_ecc_480 = (SignatureBlockEcc480*)buf;
             memset(sig_ecc_480->signature, 0, sizeof(sig_ecc_480->signature));
             break;
         }
-        case TikType_SigHmac160:
+        case TmdType_SigHmac160:
         {
             SignatureBlockHmac160 *sig_hmac_160 = (SignatureBlockHmac160*)buf;
             memset(sig_hmac_160->signature, 0, sizeof(sig_hmac_160->signature));
@@ -226,18 +242,15 @@ void tikFakesignTicket(void *buf, size_t buf_size)
             break;
     }
     
-    /* Wipe ECDH data and console ID. */
-    memset(tik_common_block->ecdh_data, 0, sizeof(tik_common_block->ecdh_data));
-    tik_common_block->console_id = 0;
-    
-    /* Modify ticket until we get a hash that starts with 0x00. */
+    /* Modify TMD until we get a hash that starts with 0x00. */
     u8 hash[SHA1_HASH_SIZE] = {0};
-    u16 *padding = (u16*)tik_common_block->reserved_3;
+    u16 *padding = (u16*)tmd_common_block->reserved_4;
+    size_t tmd_size = TMD_COMMON_BLOCK_SIZE(tmd_common_block);
     
     for(u16 i = 0; i < 65535; i++)
     {
         *padding = bswap_16(i);
-        mbedtls_sha1((u8*)tik_common_block, sizeof(TikCommonBlock), hash);
+        mbedtls_sha1((u8*)tmd_common_block, tmd_size, hash);
         if (hash[0] == 0) break;
     }
 }

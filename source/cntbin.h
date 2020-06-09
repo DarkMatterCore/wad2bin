@@ -24,28 +24,23 @@
 #ifndef __CNTBIN_H__
 #define __CNTBIN_H__
 
-#include "types.h"
 #include "wad.h"
-
-
-
-
-
+#include "crypto.h"
 
 #define IMET_MAGIC  (u32)0x494D4554
 
 typedef struct {
     u8 padding_1[0x40];
-    u32 magic;              ///< "IMET".
-    u32 hash_size;          ///< Hashed area size. Always set to 0x600.
-    u32 file_count;         ///< Always set to 3 (icon.bin, banner.bin, sound.bin).
-    u32 icon_bin_size;      ///< icon.bin size.
-    u32 banner_bin_size;    ///< banner.bin size.
-    u32 sound_bin_size;     ///< sound.bin size.
+    u32 magic;                      ///< "IMET".
+    u32 hash_size;                  ///< Hashed area size. Always set to 0x600.
+    u32 file_count;                 ///< Always set to 3 (icon.bin, banner.bin, sound.bin).
+    u32 icon_bin_size;              ///< icon.bin size.
+    u32 banner_bin_size;            ///< banner.bin size.
+    u32 sound_bin_size;             ///< sound.bin size.
     u8 reserved[0x04];
-    u16 names[10][42];      ///< Title names in different languages (Japanese, English, German, French, Spanish, Italian, Dutch, unknown, unknown, Korean). Encoded using UTF-16BE.
+    u16 names[10][42];              ///< Title names in different languages (Japanese, English, German, French, Spanish, Italian, Dutch, unknown, unknown, Korean). Encoded using UTF-16BE.
     u8 padding_2[0x24C];
-    u8 imet_hash[0x10];     ///< MD5 hash from the magic word to hash_size. This field must be set to zeroes when calculating the hash.
+    u8 imet_hash[MD5_HASH_SIZE];    ///< MD5 hash from the magic word to hash_size. This field must be set to zeroes when calculating the hash.
 } BannerImetHeader;
 
 /// content.bin encrypted header, also known as Part A.
@@ -56,14 +51,14 @@ typedef struct {
 /// Finally, Part F is cleartext certificate area used to verify the package validity, using an ECC signature that's calculated from Part C onwards.
 /// Each part from a content.bin file must be aligned to a 64-byte boundary, using zeroes to pad data if necessary (except for the end of Part D and the start of Part E).
 typedef struct {
-    u64 title_id;                   ///< Title ID.
-    u32 icon_area_size;             ///< Encrypted icon.bin area size.
-    u8 header_hash[0x10];           ///< MD5 hash of the header with this field set to zeroes.
-    u8 icon_area_hash[0x10];        ///< MD5 hash of the decrypted icon.bin area.
-    u32 unknown_lower_tid;          ///< Lower ID from another title (unknown purpose).
-    u64 ref_title_id_1;             ///< Full ID from another title (unknown purpose).
-    u64 ref_title_id_2;             ///< Full ID from another title (unknown purpose).
-    BannerImetHeader imet_header;   ///< IMET header.
+    u64 title_id;                       ///< Title ID.
+    u32 icon_area_size;                 ///< Encrypted icon.bin area size.
+    u8 header_hash[MD5_HASH_SIZE];      ///< MD5 hash of the header with this field set to zeroes.
+    u8 icon_area_hash[MD5_HASH_SIZE];   ///< MD5 hash of the decrypted icon.bin area.
+    u32 unknown_lower_tid;              ///< Lower ID from another title (unknown purpose).
+    u64 ref_title_id_1;                 ///< Full ID from another title (unknown purpose).
+    u64 ref_title_id_2;                 ///< Full ID from another title (unknown purpose).
+    BannerImetHeader imet_header;       ///< IMET header.
 } CntBinHeader;
 
 
