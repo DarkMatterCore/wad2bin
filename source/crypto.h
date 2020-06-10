@@ -52,8 +52,8 @@ void cryptoAes128CbcResetContextIv(CryptoAes128CbcContext *ctx, const void *iv);
 bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt);
 
 /// Generates an ECSDA signature using the provided ECC private key.
-/// Takes care of handling key/signature padding when needed. If unpadded_sig is true, the output signature won't include two 0x00 bytes before each coordinate.
-void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool unpadded_sig);
+/// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.
+void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig);
 
 /// Generates an ECC public key using the provided ECC private key.
 /// Takes care of handling key padding when needed. The generated key can be used in AP certificates.

@@ -86,7 +86,7 @@ bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *sr
     return (ret == 0);
 }
 
-void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool unpadded_sig)
+void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig)
 {
     if (!private_key || !dst || !src || !size) return;
     
@@ -113,19 +113,19 @@ void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void
     ecdsa_sign(hash, priv_key, r, s);
     mpz_clear(hash);
     
-    /* Convert ECSDA signature to byte stream. */
+    /* Convert ECSDA signature to a byte stream. */
     elem_to_os(r, full_sig);
     elem_to_os(s, full_sig + 32);
     
-    if (unpadded_sig)
+    if (padded_sig)
     {
+        /* Copy ECSDA signature as-is. */
+        memcpy(dst_u8, full_sig, ECSDA_SIG_SIZE);
+    } else {
         /* Generate unpadded ECSDA signature. */
         /* Wii ECSDA signatures are normally 60 bytes long. */
         memcpy(dst_u8, full_sig + 2, 30);
         memcpy(dst_u8 + 30, full_sig + 34, 30);
-    } else {
-        /* Copy ECSDA signature as-is. */
-        memcpy(dst_u8, full_sig, ECSDA_SIG_SIZE);
     }
 }
 
@@ -155,7 +155,7 @@ void cryptoGenerateEccPublicKey(const void *private_key, void *dst)
     /* Generate ECDH shared secret. This will serve as our ECC public key. */
     ec_point_mul(priv_key, &G, &shared_secret);
     
-    /* Convert ECC public key to byte stream. */
+    /* Convert ECC public key to a byte stream. */
     point_to_os(&shared_secret, full_pub_key);
     
     /* Generate unpadded ECC public key. */
