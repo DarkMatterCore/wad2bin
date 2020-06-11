@@ -24,7 +24,7 @@
 #ifndef __OS_H__
 #define __OS_H__
 
-#ifdef _WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #include <wchar.h>
 #endif
 
@@ -46,7 +46,7 @@
 #define bswap_32(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap32(val))
 #define bswap_64(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap64(val))
 
-#ifdef _WIN32
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 typedef wchar_t os_char_t;   /// UTF-16.
 typedef _WDIR os_dir_t;
 typedef struct _wdirent os_dirent_t;
@@ -66,7 +66,6 @@ typedef struct _stat os_stat_t;
 #define os_strlen                       wcslen
 #define os_strcmp                       wcscmp
 #define os_strncmp                      wcsncmp
-#define os_snprintf(out, num, fmt, ...) swprintf(out, num, (os_char_t*)fmt, ##__VA_ARGS__)
 #define os_strcat                       wcscat
 #define os_mkdir(path, mode)            _wmkdir(path)
 #define os_rmdir                        _wrmdir
@@ -75,7 +74,9 @@ typedef struct _stat os_stat_t;
 #define os_closedir                     _wclosedir
 #define os_remove                       _wremove
 #define os_stat                         _wstat
-#else /* _WIN32 */
+
+int os_snprintf(os_char_t *out, size_t len, const char *fmt, ...);
+#else /* WIN32 || _WIN32 || __WIN32__ || __NT__ */
 typedef char os_char_t;     /// UTF-8.
 typedef DIR os_dir_t;
 typedef struct dirent os_dirent_t;
@@ -104,6 +105,6 @@ typedef struct stat os_stat_t;
 #define os_closedir                     closedir
 #define os_remove                       remove
 #define os_stat                         stat
-#endif /* _WIN32 */
+#endif /* WIN32 || _WIN32 || __WIN32__ || __NT__ */
 
 #endif /* __OS_H__ */

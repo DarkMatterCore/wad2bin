@@ -20,6 +20,7 @@
  */
 
 #include "utils.h"
+#include "ConvertUTF.h"
 
 void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...)
 {
@@ -32,6 +33,121 @@ void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...)
     va_end(args);
     
     printf("\n");
+}
+
+bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src)
+{
+    size_t src_len = 0, dst_len = 0;
+    
+    const UTF8 *src_start = (const UTF8*)src;
+    UTF16 *dst_start = (UTF16*)dst;
+    
+    ConversionResult res = conversionOK;
+    
+    if (!dst || !src || !(src_len = strlen(src)))
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    dst_len = (src_len + 1);
+    
+    const UTF8 *src_end = (const UTF8*)(src + src_len);
+    UTF16 *dst_end = (UTF16*)(dst + dst_len);
+    
+    res = ConvertUTF8toUTF16(&src_start, src_end, &dst_start, dst_end, strictConversion);
+    if (res != conversionOK)
+    {
+        ERROR_MSG("UTF-8 to UTF-16 conversion failed! (%d).", res);
+        return false;
+    }
+    
+    return true;
+}
+
+bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, size_t expected_size)
+{
+    if (!file_path || !os_strlen(file_path) || !buf || !expected_size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    FILE *fd = NULL;
+    size_t file_size = 0, res = 0;
+    bool success = false;
+    
+    /* Open file. */
+    fd = os_fopen(file_path, OS_MODE_READ);
+    if (!fd)
+    {
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode!", file_path);
+        return false;
+    }
+    
+    /* Get file size. */
+    os_fseek(fd, 0, SEEK_END);
+    file_size = os_ftell(fd);
+    rewind(fd);
+    
+    /* Check file size. */
+    if (file_size != expected_size)
+    {
+        ERROR_MSG("File size for \"" OS_PRINT_STR "\" doesn't match expected size! (0x%" PRIx64 " != 0x%" PRIx64 ").", file_path, file_size, expected_size);
+        goto out;
+    }
+    
+    /* Read file data. */
+    res = fread(buf, 1, expected_size, fd);
+    if (res != expected_size)
+    {
+        ERROR_MSG("Unable to read 0x%" PRIx64 " bytes block from \"" OS_PRINT_STR "\"!", expected_size, file_path);
+        goto out;
+    }
+    
+    success = true;
+    
+out:
+    fclose(fd);
+    
+    return success;
+}
+
+bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t size)
+{
+    if (!out_path || !os_strlen(out_path) || !buf || !size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    FILE *fd = NULL;
+    size_t res = 0;
+    bool success = true;
+    
+    /* Open file. */
+    fd = os_fopen(out_path, OS_MODE_WRITE);
+    if (!fd)
+    {
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        return false;
+    }
+    
+    /* Write data to file. */
+    res = fwrite(buf, 1, size, fd);
+    if (res != size)
+    {
+        ERROR_MSG("Failed to write 0x%" PRIx64 " bytes block to \"" OS_PRINT_STR "\"!", size, out_path);
+        success = false;
+    }
+    
+    /* Close file. */
+    fclose(fd);
+    
+    /* Delete file if write failed. */
+    if (!success) os_remove(out_path);
+    
+    return success;
 }
 
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)

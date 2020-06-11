@@ -134,4 +134,14 @@ bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block);
 /// Fakesigns a TMD stored in a buffer.
 void tmdFakesignTitleMetadata(void *buf, size_t buf_size);
 
+/// Byteswaps fields from a TMD content record.
+ALWAYS_INLINE void tmdByteswapTitleMetadataContentRecordFields(TmdContentRecord *content_record)
+{
+    if (!content_record) return;
+    content_record->content_id = bswap_32(content_record->content_id);
+    content_record->index = bswap_16(content_record->index);
+    content_record->type = bswap_16(content_record->type);
+    content_record->size = bswap_64(content_record->size);
+}
+
 #endif /* __TMD_H__ */

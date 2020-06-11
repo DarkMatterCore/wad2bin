@@ -46,10 +46,13 @@ typedef struct {
 } CryptoAes128CbcContext;
 
 /// AES-128-CBC crypto functions.
-bool cryptoAes128CbcCreateContext(CryptoAes128CbcContext *ctx, const void *key, const void *iv, bool is_encryptor);
-void cryptoAes128CbcFreeContext(CryptoAes128CbcContext *ctx);
-void cryptoAes128CbcResetContextIv(CryptoAes128CbcContext *ctx, const void *iv);
-bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt);
+bool cryptoAes128CbcContextInit(CryptoAes128CbcContext *ctx, const void *key, const void *iv, bool is_encryptor);
+void cryptoAes128CbcContextFree(CryptoAes128CbcContext *ctx);
+void cryptoAes128CbcContextResetIv(CryptoAes128CbcContext *ctx, const void *iv);
+bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt);
+
+/// Simple all-in-one AES-128-CBC crypto function.
+bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, size_t size, bool encrypt);
 
 /// Generates an ECSDA signature using the provided ECC private key.
 /// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.

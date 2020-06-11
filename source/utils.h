@@ -27,6 +27,8 @@
 #include "types.h"
 #include "os.h"
 
+#define VERSION                         "0.1"
+
 #define ERROR_MSG(fmt, ...)             utilsPrintErrorMessage(__func__, fmt, ##__VA_ARGS__)
 
 #define MEMBER_SIZE(type, member)       sizeof(((type*)NULL)->member)
@@ -46,13 +48,16 @@
 #define TITLE_TYPE_DISC_BASED_CHANNEL   (u32)0x00010004
 #define TITLE_TYPE_DLC                  (u32)0x00010005
 
+#define SD_CONTENT_PATH_LENGTH          34
+
 void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
+bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src);
+
+bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, size_t expected_size);
+
+bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t size);
+
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
-
-
-
-
-
 
 #endif /* __UTILS_H__ */

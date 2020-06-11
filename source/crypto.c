@@ -24,7 +24,7 @@
 #include "utils.h"
 #include "crypto.h"
 
-bool cryptoAes128CbcCreateContext(CryptoAes128CbcContext *ctx, const void *key, const void *iv, bool is_encryptor)
+bool cryptoAes128CbcContextInit(CryptoAes128CbcContext *ctx, const void *key, const void *iv, bool is_encryptor)
 {
     if (!ctx || !key || !iv)
     {
@@ -54,14 +54,14 @@ out:
     return (ret == 0);
 }
 
-void cryptoAes128CbcFreeContext(CryptoAes128CbcContext *ctx)
+void cryptoAes128CbcContextFree(CryptoAes128CbcContext *ctx)
 {
     if (!ctx) return;
     mbedtls_aes_free(&(ctx->aes_ctx));
     memset(ctx, 0, sizeof(CryptoAes128CbcContext));
 }
 
-void cryptoAes128CbcResetContextIv(CryptoAes128CbcContext *ctx, const void *iv)
+void cryptoAes128CbcContextResetIv(CryptoAes128CbcContext *ctx, const void *iv)
 {
     if (!ctx || !iv) return;
     
@@ -69,9 +69,9 @@ void cryptoAes128CbcResetContextIv(CryptoAes128CbcContext *ctx, const void *iv)
     memcpy(ctx->iv, iv, AES_BLOCK_SIZE);
 }
 
-bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt)
+bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt)
 {
-    if (!ctx || !dst || !src || (size % AES_BLOCK_SIZE) > 0)
+    if (!ctx || !dst || !src || (size % AES_BLOCK_SIZE) != 0)
     {
         ERROR_MSG("Invalid parameters!");
         return false;
@@ -84,6 +84,39 @@ bool cryptoAes128CbcCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *sr
     if (ret != 0) ERROR_MSG("AES %s failed! (%d).", (encrypt ? "encryption" : "decryption"), ret);
     
     return (ret == 0);
+}
+
+bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, size_t size, bool encrypt)
+{
+    if (!key || !iv || !dst || !src || (size % AES_BLOCK_SIZE) != 0)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    CryptoAes128CbcContext ctx = {0};
+    bool success = false;
+    
+    /* Initialize AES-128-CBC context. */
+    if (!cryptoAes128CbcContextInit(&ctx, key, iv, encrypt))
+    {
+        ERROR_MSG("Failed to initialize AES-128-CBC context!");
+        return false;
+    }
+    
+    /* Perform AES-128-CBC crypto operation. */
+    if (!cryptoAes128CbcContextCrypt(&ctx, dst, src, size, encrypt))
+    {
+        ERROR_MSG("Failed to perform AES-128-CBC %s!", (encrypt ? "encryption" : "decryption"));
+        goto out;
+    }
+    
+    success = true;
+    
+out:
+    cryptoAes128CbcContextFree(&ctx);
+    
+    return success;
 }
 
 void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig)

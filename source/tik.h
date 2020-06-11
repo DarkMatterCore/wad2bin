@@ -25,6 +25,7 @@
 #define __TIK_H__
 
 #include "signature.h"
+#include "crypto.h"
 
 #define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160) */
 
@@ -56,7 +57,7 @@ typedef struct {
 typedef struct {
     u8 ecdh_data[0x3C];             ///< ECDH data. Used to generate one-time key during install of console specific titles.
     u8 reserved_1[0x03];
-    u8 titlekey[0x10];              ///< Encrypted titlekey. Its decrypted form is used to encrypt all content files from a title.
+    u8 titlekey[AES_BLOCK_SIZE];    ///< Encrypted titlekey. Its decrypted form is used to encrypt all content files from a title.
     u8 reserved_2;
     u64 ticket_id;                  ///< Ticket ID. Used as the IV for titlekey decryption of console specific titles.
     u32 console_id;                 ///< Console ID.
