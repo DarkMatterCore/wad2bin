@@ -25,8 +25,6 @@
 #include "tmd.h"
 #include "wad.h"
 
-#define WAD_BLOCK_ALIGNMENT     0x40
-
 #define WAD_CONTENT_BLOCKSIZE   0x800000    /* 8 MiB. */
 
 static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 titlekey[AES_BLOCK_SIZE], const u8 iv[AES_BLOCK_SIZE], const TmdContentRecord *content_record, const os_char_t *out_path);
@@ -97,6 +95,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     /* Byteswap WAD package header fields. */
     wadByteswapInstallablePackageHeaderFields(&wad_header);
     
+    /* Print header info. */
+    char wad_type[3] = { (u8)(wad_header.type >> 8), (u8)wad_header.type, 0 };
+    printf("WAD package size: 0x%" PRIx64 ".\n", wad_size);
+    printf("WAD header size: 0x%" PRIx32 " (%s).\n", wad_header.header_size, WAD_HEADER_SIZE_STR(wad_header.header_size));
+    printf("WAD type: \"%s\" (%s).\n", wad_type, WAD_TYPE_STR(wad_header.type));
+    printf("WAD version: %u (%s).\n", wad_header.version, WAD_VERSION_STR(wad_header.version));
+    printf("WAD certificate chain size: 0x%" PRIx32 ".\n", wad_header.cert_chain_size);
+    printf("WAD ticket size: 0x%" PRIx32 ".\n", wad_header.ticket_size);
+    printf("WAD TMD size: 0x%" PRIx32 ".\n", wad_header.tmd_size);
+    printf("WAD content data size: 0x%" PRIx32 ".\n\n", wad_header.data_size);
+    
     /* Check header fields. */
     /* Ignore WadType_Boot2Package while we're at it. */
     if (wad_header.header_size != WadHeaderSize_InstallablePackage || wad_header.type != WadType_NormalPackage || wad_header.version != WadVersion_InstallablePackage || \
@@ -140,8 +149,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         goto out;
     }
     
-    /* Check if the title we're dealing with is exportable. */
+    /* Retrieve ticket common block. */
     tik_common_block = tikGetCommonBlockFromBuffer(ticket, wad_header.ticket_size, NULL);
+    
+    /* Print ticket information */
+    utilsPrintHexData("Ticket Encrypted Titlekey: ", tik_common_block->titlekey, AES_BLOCK_SIZE);
+    printf("Ticket ID: %016" PRIx64 ".\n", bswap_64(tik_common_block->ticket_id));
+    printf("Ticket Console ID: %08" PRIx32 ".\n", bswap_32(tik_common_block->console_id));
+    printf("Ticket Title ID: %016" PRIx64 ".\n", bswap_64(tik_common_block->title_id));
+    printf("Ticket Title Version: %u.\n\n", bswap_16(tik_common_block->title_version));
+    
+    /* Check if the title we're dealing with is exportable. */
     if (!tikIsTitleExportable(tik_common_block))
     {
         ERROR_MSG("Invalid Title ID type!\nOnly downloadable channels, disc-based game channels and DLCs are exportable!");
@@ -150,7 +168,11 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     
     /* Check if the ticket was issued for the target console. */
     /* If not, then we'll need to fakesign it. */
-    if (bswap_32(tik_common_block->console_id) != console_id) tikFakesignTicket(ticket, wad_header.ticket_size);
+    if (bswap_32(tik_common_block->console_id) != console_id)
+    {
+        tikFakesignTicket(ticket, wad_header.ticket_size);
+        printf("Ticket fakesigned (not issued for target console).\n\n");
+    }
     
     /* Save ticket. */
     os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "tik.bin", out_dir);
@@ -172,8 +194,22 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         goto out;
     }
     
-    /* Check if the TMD system version field is valid. */
+    /* Retrieve TMD common block. */
     tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, wad_header.tmd_size, NULL);
+    
+    /* Print TMD information. */
+    printf("TMD Version: %u.\n", tmd_common_block->tmd_version);
+    printf("TMD Target System: 0x%02" PRIx8 " (%s).\n", tmd_common_block->target_system, TMD_TARGET_SYSTEM_STR(tmd_common_block->target_system));
+    printf("TMD System Version: %016" PRIx64 ".\n", bswap_64(tmd_common_block->system_version));
+    printf("TMD Title ID: %016" PRIx64 ".\n", bswap_64(tmd_common_block->title_id));
+    printf("TMD Title Type: 0x%08" PRIx32 ".\n", bswap_32(tmd_common_block->title_type));
+    printf("TMD Publisher: %.*s.\n", (int)sizeof(tmd_common_block->group_id), tmd_common_block->group_id);
+    printf("TMD Region: 0x%04" PRIx16 ".\n", bswap_16(tmd_common_block->region));
+    printf("TMD Title Version: %u.\n", bswap_16(tmd_common_block->title_version));
+    printf("TMD Content Count: %u.\n", bswap_16(tmd_common_block->content_count));
+    printf("TMD Boot Index: %u.\n\n", bswap_16(tmd_common_block->boot_index));
+    
+    /* Check if the TMD system version field is valid. */
     if (!tmdIsSystemVersionValid(tmd_common_block))
     {
         ERROR_MSG("Invalid TMD system version field!\nThis is probably an IOS / boot2 WAD package!");
@@ -203,6 +239,8 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     
     /* Generate decrypted titlekey. */
     memcpy(titlekey_iv, (u8*)(&(tik_common_block->title_id)), sizeof(u64));
+    utilsPrintHexData("Titlekey IV: ", titlekey_iv, AES_BLOCK_SIZE);
+    
     common_key = (tik_common_block->common_key_index == TikCommonKeyIndex_Korean ? keysGetWiiKoreanKey() : \
                  (tik_common_block->common_key_index == TikCommonKeyIndex_vWii ? keysGetVirtualWiiCommonKey() : keysGetWiiCommonKey()));
     
@@ -211,6 +249,9 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         ERROR_MSG("Failed to generate decrypted titlekey!");
         goto out;
     }
+    
+    utilsPrintHexData("Decrypted titlekey: ", dec_titlekey, AES_BLOCK_SIZE);
+    printf("\n");
     
     /* Process content files. */
     content_count = bswap_16(tmd_common_block->content_count);
@@ -224,6 +265,15 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         
         /* Byteswap content record fields. */
         tmdByteswapTitleMetadataContentRecordFields(&(tmd_contents[i]));
+        
+        /* Print content info. */
+        printf("TMD content #%u:\n", i + 1);
+        printf("Content ID: %08" PRIx32 ".\n", tmd_contents[i].content_id);
+        printf("Content index: %04" PRIx16 ".\n", tmd_contents[i].index);
+        printf("Content type: %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
+        printf("Content size: 0x%" PRIx64 ".\n", tmd_contents[i].size);
+        utilsPrintHexData("Content SHA-1 hash: ", tmd_contents[i].hash, SHA1_HASH_SIZE);
+        printf("\n");
         
         /* Generate output path for the current content. */
         os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "%08" PRIx16 ".app", out_dir, tmd_contents[i].index);

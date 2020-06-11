@@ -147,11 +147,6 @@ typedef struct {
     CertPublicKeyBlockEcc480 pub_key_block;
 } CertSigHmac160PubKeyEcc480;
 
-/// Determines if a buffer holds a valid certificate and saves its type and size to the input pointers.
-/// out_type and out_size can be NULL, but at least one of them must be a valid pointer.
-/// Returns false if an error occurs.
-bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
-
 /// Reads a raw certificate chain from a file and validates all signature and public key sizes.
 u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size);
 

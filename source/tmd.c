@@ -22,72 +22,7 @@
 #include "utils.h"
 #include "tmd.h"
 
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size)
-{
-    if (!buf || buf_size < TMD_MIN_SIZE || (!out_type && !out_size))
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    u32 sig_type = 0;
-    size_t offset = 0;
-    u8 type = TmdType_None;
-    const u8 *buf_u8 = (const u8*)buf;
-    const TmdCommonBlock *tmd_common_block = NULL;
-    
-    memcpy(&sig_type, buf_u8, sizeof(u32));
-    sig_type = bswap_32(sig_type);
-    
-    switch(sig_type)
-    {
-        case SignatureType_Rsa4096Sha1:
-        case SignatureType_Rsa4096Sha256:
-            type = TmdType_SigRsa4096;
-            offset += sizeof(SignatureBlockRsa4096);
-            break;
-        case SignatureType_Rsa2048Sha1:
-        case SignatureType_Rsa2048Sha256:
-            type = TmdType_SigRsa2048;
-            offset += sizeof(SignatureBlockRsa2048);
-            break;
-        case SignatureType_Ecc480Sha1:
-        case SignatureType_Ecc480Sha256:
-            type = TmdType_SigEcc480;
-            offset += sizeof(SignatureBlockEcc480);
-            break;
-        case SignatureType_Hmac160Sha1:
-            type = TmdType_SigHmac160;
-            offset += sizeof(SignatureBlockHmac160);
-            break;
-        default:
-            ERROR_MSG("Invalid signature type value! (0x%" PRIx32 ").", sig_type);
-            return false;
-    }
-    
-    tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
-    offset += sizeof(TmdCommonBlock);
-    
-    /* Retrieve content count. */
-    u16 content_count = bswap_16(tmd_common_block->content_count);
-    if (!content_count || content_count > TMD_MAX_CONTENT_COUNT)
-    {
-        ERROR_MSG("Invalid TMD content count!");
-        return false;
-    }
-    
-    offset += (content_count * sizeof(TmdContentRecord));
-    if (offset > buf_size)
-    {
-        ERROR_MSG("Calculated end offset exceeds TMD buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
-        return false;
-    }
-    
-    if (out_type) *out_type = type;
-    if (out_size) *out_size = offset;
-    
-    return true;
-}
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose);
 
 u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
 {
@@ -122,7 +57,13 @@ u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
     }
     
     /* Check if the TMD size is valid. */
-    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size) || tmd_size != tmd_detected_size) goto out;
+    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size, true)) goto out;
+    
+    if (tmd_size != tmd_detected_size)
+    {
+        ERROR_MSG("\nCalculated TMD size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", tmd_size, tmd_detected_size);
+        goto out;
+    }
     
     success = true;
     
@@ -148,7 +89,7 @@ TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_
     u8 *buf_u8 = (u8*)buf;
     TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!tmdGetTitleMetadataTypeAndSize(buf, buf_size, &tmd_type, NULL))
+    if (!tmdGetTitleMetadataTypeAndSize(buf, buf_size, &tmd_type, NULL, false))
     {
         ERROR_MSG("Invalid TMD!");
         return NULL;
@@ -250,4 +191,77 @@ void tmdFakesignTitleMetadata(void *buf, size_t buf_size)
         mbedtls_sha1((u8*)tmd_common_block, tmd_size, hash);
         if (hash[0] == 0) break;
     }
+}
+
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose)
+{
+    if (!buf || buf_size < TMD_MIN_SIZE || (!out_type && !out_size))
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    u32 sig_type = 0;
+    size_t offset = 0;
+    u8 type = TmdType_None;
+    const u8 *buf_u8 = (const u8*)buf;
+    const TmdCommonBlock *tmd_common_block = NULL;
+    
+    memcpy(&sig_type, buf_u8, sizeof(u32));
+    sig_type = bswap_32(sig_type);
+    
+    switch(sig_type)
+    {
+        case SignatureType_Rsa4096Sha1:
+        case SignatureType_Rsa4096Sha256:
+            type = TmdType_SigRsa4096;
+            offset += sizeof(SignatureBlockRsa4096);
+            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Rsa2048Sha1:
+        case SignatureType_Rsa2048Sha256:
+            type = TmdType_SigRsa2048;
+            offset += sizeof(SignatureBlockRsa2048);
+            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Ecc480Sha1:
+        case SignatureType_Ecc480Sha256:
+            type = TmdType_SigEcc480;
+            offset += sizeof(SignatureBlockEcc480);
+            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Hmac160Sha1:
+            type = TmdType_SigHmac160;
+            offset += sizeof(SignatureBlockHmac160);
+            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            break;
+        default:
+            ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
+            return false;
+    }
+    
+    if (verbose) printf("TMD signature issuer: %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
+    
+    tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
+    offset += sizeof(TmdCommonBlock);
+    
+    /* Retrieve content count. */
+    u16 content_count = bswap_16(tmd_common_block->content_count);
+    if (!content_count || content_count > TMD_MAX_CONTENT_COUNT)
+    {
+        ERROR_MSG("\nInvalid TMD content count!");
+        return false;
+    }
+    
+    offset += (content_count * sizeof(TmdContentRecord));
+    if (offset > buf_size)
+    {
+        ERROR_MSG("\nCalculated end offset exceeds TMD buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
+        return false;
+    }
+    
+    if (out_type) *out_type = type;
+    if (out_size) *out_size = offset;
+    
+    return true;
 }

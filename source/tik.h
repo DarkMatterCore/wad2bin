@@ -94,11 +94,6 @@ typedef struct {
     TikCommonBlock tik_common_block;
 } TikSigHmac160;
 
-/// Determines if a buffer holds a valid ticket and saves its type and size to the input pointers.
-/// out_type and out_size can be NULL, but at least one of them must be a valid pointer.
-/// Returns false if an error occurs.
-bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
-
 /// Reads a ticket from a file and validates its signature size.
 u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size);
 

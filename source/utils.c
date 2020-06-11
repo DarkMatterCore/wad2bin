@@ -150,6 +150,19 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t siz
     return success;
 }
 
+void utilsPrintHexData(const char *msg, const void *data, size_t size)
+{
+    if (!data || !size) return;
+    
+    if (msg && strlen(msg)) printf(msg);
+    
+    const u8 *data_u8 = (const u8*)data;
+    
+    for(size_t i = 0; i < size; i++) printf("%x", data_u8[i]);
+    
+    printf(".\n");
+}
+
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)
 {
     os_dir_t *dir = NULL;

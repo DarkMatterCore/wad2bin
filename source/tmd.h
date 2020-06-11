@@ -32,6 +32,9 @@
 #define TMD_COMMON_BLOCK_SIZE(x)    (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
 #define TMD_CONTENTS(x)             ((TmdContentRecord*)(((u8*)(x)) + sizeof(TmdCommonBlock)))
 
+#define TMD_TARGET_SYSTEM_STR(x)    ((x) == TmdTargetSystem_Wii ? "Wii" : ((x) == TmdTargetSystem_vWii ? "vWii" : "Unknown"))
+#define TMD_CONTENT_REC_TYPE_STR(x) ((x) == TmdContentRecordType_Normal ? "Normal" : ((x) == TmdContentRecordType_DLC ? "DLC" : ((x) == TmdContentRecordType_Shared ? "Shared" : "Unknown")))
+
 typedef enum {
     TmdType_None        = 0,
     TmdType_SigRsa4096  = 1,
@@ -41,7 +44,7 @@ typedef enum {
 } TmdType;
 
 typedef enum {
-    TmdTargetSystem_Normal = 0,
+    TmdTargetSystem_Wii    = 0,
     TmdTargetSystem_vWii   = 1
 } TmdTargetSystem;
 
@@ -115,11 +118,6 @@ typedef struct {
     SignatureBlockHmac160 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
 } TmdSigHmac160;
-
-/// Determines if a buffer holds a valid TMD and saves its type and size to the input pointers.
-/// out_type and out_size can be NULL, but at least one of them must be a valid pointer.
-/// Returns false if an error occurs.
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size);
 
 /// Reads a TMD from a file and validates its signature size.
 u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size);

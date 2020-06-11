@@ -24,6 +24,11 @@
 #ifndef __WAD_H__
 #define __WAD_H__
 
+#define WAD_BLOCK_ALIGNMENT     0x40
+#define WAD_HEADER_SIZE_STR(x)  ((x) == WadHeaderSize_InstallablePackage ? "InstallablePackage" : ((x) == WadHeaderSize_BackupPackage ? "BackupPackage" : "Unknown"))
+#define WAD_TYPE_STR(x)         ((x) == WadType_NormalPackage ? "Normal" : ((x) == WadType_Boot2Package ? "Boot2" : ((x) == WadType_BackupPackage ? "Backup" : "Unknown")))
+#define WAD_VERSION_STR(x)      ((x) == WadVersion_InstallablePackage ? "InstallablePackage" : ((x) == WadVersion_BackupPackage ? "BackupPackage" : "Unknown"))
+
 typedef enum {
     WadHeaderSize_InstallablePackage = 0x20,    ///< Used with Normal and Boot2 WAD packages. Equivalent to `sizeof(WadInstallablePackageHeader)`.
     WadHeaderSize_BackupPackage      = 0x70     ///< Used with Backup WAD packages. Equivalent to `sizeof(WadBackupPackageHeader)`.

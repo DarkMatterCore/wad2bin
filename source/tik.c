@@ -23,61 +23,7 @@
 #include "tik.h"
 #include "crypto.h"
 
-bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size)
-{
-    if (!buf || buf_size < TIK_MIN_SIZE || (!out_type && !out_size))
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    u32 sig_type = 0;
-    size_t offset = 0;
-    u8 type = TikType_None;
-    const u8 *buf_u8 = (const u8*)buf;
-    
-    memcpy(&sig_type, buf_u8, sizeof(u32));
-    sig_type = bswap_32(sig_type);
-    
-    switch(sig_type)
-    {
-        case SignatureType_Rsa4096Sha1:
-        case SignatureType_Rsa4096Sha256:
-            type = TikType_SigRsa4096;
-            offset += sizeof(SignatureBlockRsa4096);
-            break;
-        case SignatureType_Rsa2048Sha1:
-        case SignatureType_Rsa2048Sha256:
-            type = TikType_SigRsa2048;
-            offset += sizeof(SignatureBlockRsa2048);
-            break;
-        case SignatureType_Ecc480Sha1:
-        case SignatureType_Ecc480Sha256:
-            type = TikType_SigEcc480;
-            offset += sizeof(SignatureBlockEcc480);
-            break;
-        case SignatureType_Hmac160Sha1:
-            type = TikType_SigHmac160;
-            offset += sizeof(SignatureBlockHmac160);
-            break;
-        default:
-            ERROR_MSG("Invalid signature type value! (0x%" PRIx32 ").", sig_type);
-            return false;
-    }
-    
-    offset += sizeof(TikCommonBlock);
-    
-    if (offset > buf_size)
-    {
-        ERROR_MSG("Calculated end offset exceeds certificate buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
-        return false;
-    }
-    
-    if (out_type) *out_type = type;
-    if (out_size) *out_size = offset;
-    
-    return true;
-}
+static bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose);
 
 u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
 {
@@ -112,7 +58,13 @@ u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
     }
     
     /* Check if the ticket size is valid. */
-    if (!tikGetTicketTypeAndSize(ticket, ticket_size, &ticket_type, &ticket_detected_size) || ticket_size != ticket_detected_size) goto out;
+    if (!tikGetTicketTypeAndSize(ticket, ticket_size, &ticket_type, &ticket_detected_size, true)) goto out;
+    
+    if (ticket_size != ticket_detected_size)
+    {
+        ERROR_MSG("\nCalculated ticket size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", ticket_size, ticket_detected_size);
+        goto out;
+    }
     
     success = true;
     
@@ -138,7 +90,7 @@ TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_
     u8 *buf_u8 = (u8*)buf;
     TikCommonBlock *tik_common_block = NULL;
     
-    if (!tikGetTicketTypeAndSize(buf, buf_size, &ticket_type, NULL))
+    if (!tikGetTicketTypeAndSize(buf, buf_size, &ticket_type, NULL, false))
     {
         ERROR_MSG("Invalid ticket!");
         return NULL;
@@ -237,4 +189,66 @@ void tikFakesignTicket(void *buf, size_t buf_size)
         mbedtls_sha1((u8*)tik_common_block, sizeof(TikCommonBlock), hash);
         if (hash[0] == 0) break;
     }
+}
+
+static bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose)
+{
+    if (!buf || buf_size < TIK_MIN_SIZE || (!out_type && !out_size))
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    u32 sig_type = 0;
+    size_t offset = 0;
+    u8 type = TikType_None;
+    const u8 *buf_u8 = (const u8*)buf;
+    
+    memcpy(&sig_type, buf_u8, sizeof(u32));
+    sig_type = bswap_32(sig_type);
+    
+    switch(sig_type)
+    {
+        case SignatureType_Rsa4096Sha1:
+        case SignatureType_Rsa4096Sha256:
+            type = TikType_SigRsa4096;
+            offset += sizeof(SignatureBlockRsa4096);
+            if (verbose) printf("Ticket signature type: 0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Rsa2048Sha1:
+        case SignatureType_Rsa2048Sha256:
+            type = TikType_SigRsa2048;
+            offset += sizeof(SignatureBlockRsa2048);
+            if (verbose) printf("Ticket signature type: 0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Ecc480Sha1:
+        case SignatureType_Ecc480Sha256:
+            type = TikType_SigEcc480;
+            offset += sizeof(SignatureBlockEcc480);
+            if (verbose) printf("Ticket signature type: 0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Hmac160Sha1:
+            type = TikType_SigHmac160;
+            offset += sizeof(SignatureBlockHmac160);
+            if (verbose) printf("Ticket signature type: 0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            break;
+        default:
+            ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
+            return false;
+    }
+    
+    if (verbose) printf("Ticket signature issuer: %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
+    
+    offset += sizeof(TikCommonBlock);
+    
+    if (offset > buf_size)
+    {
+        ERROR_MSG("\nCalculated end offset exceeds certificate buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
+        return false;
+    }
+    
+    if (out_type) *out_type = type;
+    if (out_size) *out_size = offset;
+    
+    return true;
 }

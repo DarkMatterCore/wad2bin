@@ -40,8 +40,10 @@ int main(int argc, char **argv)
     
     if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + 1 + SD_CONTENT_PATH_LENGTH) >= MAX_PATH)
     {
-        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n", argv[0]);
-        printf("Paths must not exceed %u characters.\n", MAX_PATH - 1);
+        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
+        printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
+        printf("The required directory tree containing the content.bin file will be created at the output directory.\n");
+        printf("You can set your SD card root directory as the output directory.\n");
         ret = -1;
         goto out;
     }
@@ -86,12 +88,18 @@ int main(int argc, char **argv)
         goto out;
     }
     
+    printf("Keydata and device certificate successfully loaded.\n\n");
+    
     /* Unpack input WAD package. */
     if (!wadUnpackInstallablePackage(paths[2], wad_output_dir))
     {
         ret = -5;
         goto out;
     }
+    
+    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n", paths[2]);
+    
+    
     
     
     
