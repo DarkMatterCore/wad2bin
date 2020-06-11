@@ -25,6 +25,8 @@
 #include "tmd.h"
 #include "wad.h"
 
+#define WAD_BLOCK_ALIGNMENT     0x40
+
 #define WAD_CONTENT_BLOCKSIZE   0x800000    /* 8 MiB. */
 
 static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 titlekey[AES_BLOCK_SIZE], const u8 iv[AES_BLOCK_SIZE], const TmdContentRecord *content_record, const os_char_t *out_path);
@@ -65,13 +67,6 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     
     bool success = false;
     
-    /* Create output directory. */
-    if (os_mkdir(out_dir, 0777) < 0)
-    {
-        ERROR_MSG("Unable to create directory \"" OS_PRINT_STR "\"!", out_dir);
-        return false;
-    }
-    
     /* Open WAD package. */
     wad_fd = os_fopen(wad_path, OS_MODE_READ);
     if (!wad_fd)
@@ -105,15 +100,16 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     /* Check header fields. */
     /* Ignore WadType_Boot2Package while we're at it. */
     if (wad_header.header_size != WadHeaderSize_InstallablePackage || wad_header.type != WadType_NormalPackage || wad_header.version != WadVersion_InstallablePackage || \
-        !wad_header.cert_chain_size || !wad_header.ticket_size || !wad_header.tmd_size || !wad_header.data_size || wad_size < (ALIGN_UP(wad_header.header_size, 0x40) + \
-        ALIGN_UP(wad_header.cert_chain_size, 0x40) + ALIGN_UP(wad_header.ticket_size, 0x40) + ALIGN_UP(wad_header.tmd_size, 0x40) + ALIGN_UP(wad_header.data_size, 0x40)))
+        !wad_header.cert_chain_size || !wad_header.ticket_size || !wad_header.tmd_size || !wad_header.data_size || wad_size < (ALIGN_UP(wad_header.header_size, WAD_BLOCK_ALIGNMENT) + \
+        ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_ALIGNMENT) + \
+        ALIGN_UP(wad_header.data_size, WAD_BLOCK_ALIGNMENT)))
     {
         ERROR_MSG("Invalid WAD header in \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
     }
     
     /* Update file stream position. */
-    wad_offset = ALIGN_UP(wad_header.header_size, 0x40);
+    wad_offset = ALIGN_UP(wad_header.header_size, WAD_BLOCK_ALIGNMENT);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
     /* Read certificate chain. */
@@ -133,7 +129,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     }
     
     /* Update file stream position. */
-    wad_offset += ALIGN_UP(wad_header.cert_chain_size, 0x40);
+    wad_offset += ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_ALIGNMENT);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
     /* Read ticket. */
@@ -165,7 +161,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     }
     
     /* Update file stream position. */
-    wad_offset += ALIGN_UP(wad_header.ticket_size, 0x40);
+    wad_offset += ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_ALIGNMENT);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
     /* Read TMD. */
@@ -202,7 +198,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     }
     
     /* Update file stream position. */
-    wad_offset += ALIGN_UP(wad_header.tmd_size, 0x40);
+    wad_offset += ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_ALIGNMENT);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
     /* Generate decrypted titlekey. */
@@ -230,7 +226,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         tmdByteswapTitleMetadataContentRecordFields(&(tmd_contents[i]));
         
         /* Generate output path for the current content. */
-        os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "%08" PRIx16 ".app", tmd_contents[i].index);
+        os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "%08" PRIx16 ".app", out_dir, tmd_contents[i].index);
         
         /* Save decrypted content file. */
         if (!wadSaveContentFileFromInstallablePackage(wad_fd, dec_titlekey, content_iv, &(tmd_contents[i]), entry_path))
@@ -250,8 +246,6 @@ out:
     if (cert_chain) free(cert_chain);
     
     if (wad_fd) fclose(wad_fd);
-    
-    if (!success) utilsRemoveDirectoryRecursively(out_dir);
     
     return success;
 }
@@ -349,6 +343,9 @@ static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 ti
         ERROR_MSG("SHA-1 checksum mismatch!");
         goto out;
     }
+    
+    /* Update file stream position if necessary. */
+    if (!IS_ALIGNED(content_record->size, WAD_BLOCK_ALIGNMENT)) os_fseek(wad_file, ALIGN_UP(content_record->size, WAD_BLOCK_ALIGNMENT) - ALIGN_UP(content_record->size, AES_BLOCK_SIZE), SEEK_CUR);
     
     success = true;
     

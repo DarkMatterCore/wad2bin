@@ -21,6 +21,7 @@
 
 #include "utils.h"
 #include "keys.h"
+#include "wad.h"
 
 #define ARG_COUNT   4
 
@@ -29,6 +30,10 @@ int main(int argc, char **argv)
     int ret = 0;
     
     os_char_t *paths[ARG_COUNT] = {0};
+    
+    os_char_t wad_output_dir[0x20] = {0};
+    os_snprintf(wad_output_dir, MAX_ELEMENTS(wad_output_dir), "." OS_PATH_SEPARATOR "wad2cntbin_unpacked_wad" OS_PATH_SEPARATOR);
+    os_mkdir(wad_output_dir, 0777);
     
     printf("\nwad2cntbin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
@@ -57,7 +62,7 @@ int main(int argc, char **argv)
         
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
         /* Convert current path string to UTF-16. */
-        /* We'll only need to perform manual conversion at this point. Paths generated at later points will all concatenate strings that use codepoints from the ANSI charset. */
+        /* We'll only need to perform manual conversion at this point. */
         if (!utilsConvertUTF8ToUTF16(paths[i], argv[i + 1]))
         {
             ERROR_MSG("Failed to convert path from UTF-8 to UTF-16!");
@@ -81,11 +86,24 @@ int main(int argc, char **argv)
         goto out;
     }
     
+    /* Unpack input WAD package. */
+    if (!wadUnpackInstallablePackage(paths[2], wad_output_dir))
+    {
+        ret = -5;
+        goto out;
+    }
     
-    printf("keys loaded");
+    
+    
+    
+    
+    
+    
     
     
 out:
+    //utilsRemoveDirectoryRecursively(wad_output_dir);
+    
     for(u32 i = 0; i < ARG_COUNT; i++)
     {
         if (paths[i]) free(paths[i]);

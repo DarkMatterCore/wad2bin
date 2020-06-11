@@ -37,6 +37,7 @@ bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_ty
     const TmdCommonBlock *tmd_common_block = NULL;
     
     memcpy(&sig_type, buf_u8, sizeof(u32));
+    sig_type = bswap_32(sig_type);
     
     switch(sig_type)
     {
@@ -121,11 +122,7 @@ u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
     }
     
     /* Check if the TMD size is valid. */
-    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size) || tmd_size != tmd_detected_size)
-    {
-        ERROR_MSG("Invalid TMD!");
-        goto out;
-    }
+    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size) || tmd_size != tmd_detected_size) goto out;
     
     success = true;
     

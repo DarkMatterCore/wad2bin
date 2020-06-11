@@ -69,10 +69,10 @@ typedef struct {
     u8 title_export;                ///< TikTitleExport. Not entirely sure about this one, I have seen exportable titles with this field set to zero.
     u8 common_key_index;            ///< TikCommonKeyIndex. Out of range values can be found in some titles, though...
     u8 unknown[0x30];               ///< Unknown. It's usually all zeroes except for VC and system titles, in which the last byte is set to 1.
-    u8 cnt_access_permissions;      ///< Content access permissions (one bit for each content). The first 0x20 bytes are usually set to 0xFF.
+    u8 access_permissions[0x40];    ///< Content access permissions (one bit for each content). The first 0x20 bytes are usually set to 0xFF.
     u8 reserved_3[0x02];
     TikTimeLimit time_limits[8];    ///< Time limits (used in SSBB VC titles).
-} TikCommonBlock;
+} PACKED TikCommonBlock;
 
 typedef struct {
     SignatureBlockRsa4096 sig_block;    ///< sig_type field is stored using big endian byte order.

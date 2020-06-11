@@ -37,6 +37,7 @@ bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, siz
     const u8 *buf_u8 = (const u8*)buf;
     
     memcpy(&sig_type, buf_u8, sizeof(u32));
+    sig_type = bswap_32(sig_type);
     
     switch(sig_type)
     {
@@ -111,11 +112,7 @@ u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
     }
     
     /* Check if the ticket size is valid. */
-    if (!tikGetTicketTypeAndSize(ticket, ticket_size, &ticket_type, &ticket_detected_size) || ticket_size != ticket_detected_size)
-    {
-        ERROR_MSG("Invalid ticket!");
-        goto out;
-    }
+    if (!tikGetTicketTypeAndSize(ticket, ticket_size, &ticket_type, &ticket_detected_size) || ticket_size != ticket_detected_size) goto out;
     
     success = true;
     

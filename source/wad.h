@@ -73,9 +73,6 @@ typedef struct {
 /// Unpacks an installable WAD package to a destination directory.
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir);
 
-
-
-
 /// Byteswaps fields from an installable WAD package.
 ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePackageHeader *wad_header)
 {

@@ -71,7 +71,7 @@ typedef struct {
     u16 type;                   ///< TmdContentRecordType.
     u64 size;
     u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
-} TmdContentRecord;
+} PACKED TmdContentRecord;
 
 /// Placed after the ticket signature block.
 typedef struct {
@@ -94,7 +94,7 @@ typedef struct {
     u16 content_count;
     u16 boot_index;
     u8 reserved_4[0x02];
-} TmdCommonBlock;
+} PACKED TmdCommonBlock;
 
 typedef struct {
     SignatureBlockRsa4096 sig_block;    ///< sig_type field is stored using big endian byte order.
