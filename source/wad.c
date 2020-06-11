@@ -273,7 +273,14 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         printf("Content type: %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
         printf("Content size: 0x%" PRIx64 ".\n", tmd_contents[i].size);
         utilsPrintHexData("Content SHA-1 hash: ", tmd_contents[i].hash, SHA1_HASH_SIZE);
+        utilsPrintHexData("Content IV: ", content_iv, AES_BLOCK_SIZE);
         printf("\n");
+        
+        if (tmd_contents[i].type != TmdContentRecordType_Normal && tmd_contents[i].type != TmdContentRecordType_DLC && tmd_contents[i].type != TmdContentRecordType_Shared)
+        {
+            ERROR_MSG("Invalid content type!");
+            goto out;
+        }
         
         /* Generate output path for the current content. */
         os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "%08" PRIx16 ".app", out_dir, tmd_contents[i].index);
