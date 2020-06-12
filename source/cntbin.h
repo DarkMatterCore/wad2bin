@@ -27,11 +27,11 @@
 #include "wad.h"
 #include "crypto.h"
 
-#define IMET_MAGIC  (u32)0x494D4554
+#define IMET_MAGIC  (u32)0x494D4554 /* "IMET". */
 
 typedef struct {
     u8 padding_1[0x40];
-    u32 magic;                      ///< "IMET".
+    u32 magic;                      ///< IMET_MAGIC.
     u32 hash_size;                  ///< Hashed area size. Always set to 0x600.
     u32 file_count;                 ///< Always set to 3 (icon.bin, banner.bin, sound.bin).
     u32 icon_bin_size;              ///< icon.bin size.

@@ -107,11 +107,11 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     printf("WAD content data size: 0x%" PRIx32 ".\n\n", wad_header.data_size);
     
     /* Check header fields. */
-    /* Ignore WadType_Boot2Package while we're at it. */
+    /* Discard WadType_Boot2Package while we're at it. */
     if (wad_header.header_size != WadHeaderSize_InstallablePackage || wad_header.type != WadType_NormalPackage || wad_header.version != WadVersion_InstallablePackage || \
-        !wad_header.cert_chain_size || !wad_header.ticket_size || !wad_header.tmd_size || !wad_header.data_size || wad_size < (ALIGN_UP(wad_header.header_size, WAD_BLOCK_ALIGNMENT) + \
-        ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_ALIGNMENT) + \
-        ALIGN_UP(wad_header.data_size, WAD_BLOCK_ALIGNMENT)))
+        !wad_header.cert_chain_size || wad_header.ticket_size < TIK_MIN_SIZE || wad_header.tmd_size < TMD_MIN_SIZE || !wad_header.data_size || \
+        wad_size < (ALIGN_UP(wad_header.header_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_ALIGNMENT) + \
+        ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_ALIGNMENT) + ALIGN_UP(wad_header.data_size, WAD_BLOCK_ALIGNMENT)))
     {
         ERROR_MSG("Invalid WAD header in \"" OS_PRINT_STR "\"!", wad_path);
         goto out;

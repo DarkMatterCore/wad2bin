@@ -23,6 +23,11 @@
 #include "keys.h"
 #include "wad.h"
 
+
+#include "u8.h"
+
+
+
 #define ARG_COUNT   4
 
 int main(int argc, char **argv)
@@ -32,7 +37,7 @@ int main(int argc, char **argv)
     os_char_t *paths[ARG_COUNT] = {0};
     
     os_char_t wad_output_dir[0x20] = {0};
-    os_snprintf(wad_output_dir, MAX_ELEMENTS(wad_output_dir), "." OS_PATH_SEPARATOR "wad2cntbin_unpacked_wad" OS_PATH_SEPARATOR);
+    os_snprintf(wad_output_dir, MAX_ELEMENTS(wad_output_dir), "." OS_PATH_SEPARATOR "wad2cntbin_unpacked_wad");
     os_mkdir(wad_output_dir, 0777);
     
     printf("\nwad2cntbin v%s (c) DarkMatterCore.\n", VERSION);
@@ -76,9 +81,9 @@ int main(int argc, char **argv)
         os_snprintf(paths[i], MAX_PATH, argv[i + 1]);
 #endif
         
-        /* Check if the output directory string doesn't end with a path separator. */
-        /* If so, concatenate a path separator to the copied path. */
-        if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] != *((u8*)OS_PATH_SEPARATOR)) os_snprintf(paths[i] + path_len, MAX_PATH - path_len, OS_PATH_SEPARATOR);
+        /* Check if the output directory string ends with a path separator. */
+        /* If so, remove it. */
+        if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
     }
     
     /* Load keydata and device certificate. */
@@ -97,7 +102,39 @@ int main(int argc, char **argv)
         goto out;
     }
     
-    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n", paths[2]);
+    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
+    
+    
+    
+    os_char_t bnr_path[MAX_PATH] = {0};
+    os_snprintf(bnr_path, MAX_PATH, OS_PRINT_STR OS_PATH_SEPARATOR "00000000.app", wad_output_dir);
+    
+    FILE *opening_bnr = os_fopen(bnr_path, OS_MODE_READ);
+    if (opening_bnr)
+    {
+        os_fseek(opening_bnr, 0x640, SEEK_SET);
+        
+        U8Context u8_ctx = {0};
+        if (u8ContextInit(opening_bnr, &u8_ctx))
+        {
+            for(u32 i = 0; i < u8_ctx.node_count; i++)
+            {
+                printf("%s\n", u8_ctx.str_table + u8_ctx.nodes[i].properties.name_offset);
+            }
+            
+            u8ContextFree(&u8_ctx);
+        }
+        
+        fclose(opening_bnr);
+    }
+    
+    
+    
+    
+    
+    /* Generate content.bin file. */
+    
+    
     
     
     
