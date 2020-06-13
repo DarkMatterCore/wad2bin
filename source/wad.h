@@ -76,7 +76,9 @@ typedef struct {
 } WadBackupPackageHeader;
 
 /// Unpacks an installable WAD package to a destination directory.
-bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir);
+/// If valid pointers are provided, certificate chain data, ticket data and/or TMD data may be saved to them.
+/// Footer data won't be unpacked.
+bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir, u8 **out_cert_chain, size_t *out_cert_chain_size, u8 **out_tik, size_t *out_tik_size, u8 **out_tmd, size_t *out_tmd_size);
 
 /// Byteswaps fields from an installable WAD package.
 ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePackageHeader *wad_header)

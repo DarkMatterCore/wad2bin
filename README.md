@@ -6,8 +6,7 @@ Guidelines:
 
 * Console-specific data is required to perform the conversion. Dump it from the target console using [xyzzy-mod](https://github.com/DarkMatterCore/xyzzy-mod).
 * A ticket for each converted WAD package must be installed on the target Wii console in order for this to work.
-* If the WAD ticket wasn't issued for the target console, the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
-* If the WAD is not legit (e.g. homebrew WAD), the same condition as the previous point applies.
+* If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
 
 Dependencies:
 

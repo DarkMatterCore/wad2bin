@@ -250,3 +250,23 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)
     
     return success;
 }
+
+void utilsCreateDirectoryTree(const os_char_t *path)
+{
+    if (!path || !os_strlen(path)) return;
+    
+    os_char_t tmp[MAX_PATH] = {0};
+    os_char_t *ptr = NULL;
+    
+    ptr = os_strchr(path, *((u8*)OS_PATH_SEPARATOR));
+    
+    while(ptr)
+    {
+        os_snprintf(tmp, MAX_PATH, OS_PRINT_PRECISION_STR, (int)(ptr - path), path);
+        os_mkdir(tmp, 0777);
+        ptr++;
+        ptr = os_strchr(ptr, *((u8*)OS_PATH_SEPARATOR));
+    }
+    
+    os_mkdir(path, 0777);
+}

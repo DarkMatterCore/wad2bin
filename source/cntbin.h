@@ -34,6 +34,9 @@
 
 #define IMD5_MAGIC              (u32)0x494D4435 /* "IMD5". */
 
+#define CONTENT_PRIVATE_PATH    OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR "title" OS_PATH_SEPARATOR "%s" /* "%s" gets replaced by the ASCII conversion of the TID lower u32 */
+#define CONTENT_NAME            "content.bin"
+
 typedef struct {
     u8 padding_1[0x40];
     u32 magic;                          ///< IMET_MAGIC.
@@ -73,6 +76,6 @@ typedef struct {
     CntBinImetHeader imet_header;       ///< IMET header.
 } CntBinHeader;
 
-bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, const os_char_t *out_path, os_char_t *tmp_path, size_t tmp_path_len);
+bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, os_char_t *out_path, os_char_t *tmp_path);
 
 #endif /* __CNTBIN_H__ */

@@ -30,13 +30,12 @@ int main(int argc, char **argv)
     
     /* Reserve memory for an extra temporary path. */
     os_char_t *paths[ARG_COUNT + 1] = {0};
-    size_t tmp_path_len = 0;
     bool res = false;
     
     printf("\nwad2cntbin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
-    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + 1 + SD_CONTENT_PATH_LENGTH) >= MAX_PATH)
+    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_LENGTH) >= MAX_PATH)
     {
         printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
@@ -62,7 +61,6 @@ int main(int argc, char **argv)
         {
             /* Save temporary path and create it. */
             os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2cntbin_wad_data");
-            tmp_path_len = os_strlen(paths[i]);
             os_mkdir(paths[i], 0777);
         } else {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -87,8 +85,7 @@ int main(int argc, char **argv)
     }
     
     /* Start conversion procedure. */
-    res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4], tmp_path_len);
-    paths[4][tmp_path_len] = (os_char_t)0;
+    res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4]);
     if (!res)
     {
         ret = -4;
@@ -96,8 +93,6 @@ int main(int argc, char **argv)
     }
     
 out:
-    //if (paths[4]) utilsRemoveDirectoryRecursively(paths[4]);
-    
     for(u32 i = 0; i <= ARG_COUNT; i++)
     {
         if (paths[i]) free(paths[i]);

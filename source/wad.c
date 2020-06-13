@@ -29,13 +29,18 @@
 
 static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 titlekey[AES_BLOCK_SIZE], const u8 iv[AES_BLOCK_SIZE], const TmdContentRecord *content_record, const os_char_t *out_path);
 
-bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir)
+bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir, u8 **out_cert_chain, size_t *out_cert_chain_size, u8 **out_tik, size_t *out_tik_size, u8 **out_tmd, size_t *out_tmd_size)
 {
-    if (!wad_path || !os_strlen(wad_path) || !out_dir || !os_strlen(out_dir))
+    if (!wad_path || !os_strlen(wad_path) || !out_dir || !os_strlen(out_dir) || (!out_cert_chain && out_cert_chain_size) || (out_cert_chain && !out_cert_chain_size) || \
+        (!out_tik && out_tik_size) || (out_tik && !out_tik_size) || (!out_tmd && out_tmd_size) || (out_tmd && !out_tmd_size))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
+    
+    bool save_cert_chain = (out_cert_chain && out_cert_chain_size);
+    bool save_ticket = (out_tik && out_tik_size);
+    bool save_tmd = (out_tmd && out_tmd_size);
     
     FILE *wad_fd = NULL;
     size_t wad_offset = 0, wad_size = 0, res = 0;
@@ -294,14 +299,32 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         }
     }
     
+    if (save_cert_chain)
+    {
+        *out_cert_chain = cert_chain;
+        *out_cert_chain_size = wad_header.cert_chain_size;
+    }
+    
+    if (save_ticket)
+    {
+        *out_tik = ticket;
+        *out_tik_size = wad_header.ticket_size;
+    }
+    
+    if (save_tmd)
+    {
+        *out_tmd = tmd;
+        *out_tmd_size = wad_header.tmd_size;
+    }
+    
     success = true;
     
 out:
-    if (tmd) free(tmd);
+    if (tmd && (!success || (success && !save_tmd))) free(tmd);
     
-    if (ticket) free(ticket);
+    if (ticket && (!success || (success && !save_ticket))) free(ticket);
     
-    if (cert_chain) free(cert_chain);
+    if (cert_chain && (!success || (success && !save_cert_chain))) free(cert_chain);
     
     if (wad_fd) fclose(wad_fd);
     

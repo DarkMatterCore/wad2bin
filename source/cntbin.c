@@ -22,10 +22,27 @@
 #include "utils.h"
 #include "keys.h"
 #include "u8.h"
+#include "tik.h"
+#include "tmd.h"
 #include "cntbin.h"
 
-bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, const os_char_t *out_path, os_char_t *tmp_path, size_t tmp_path_len)
+bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, os_char_t *out_path, os_char_t *tmp_path)
 {
+    size_t out_path_len = os_strlen(out_path), new_out_path_len = 0;
+    size_t tmp_path_len = os_strlen(tmp_path);
+    
+    u8 *ticket = NULL;
+    size_t ticket_size = 0;
+    TikCommonBlock *tik_common_block = NULL;
+    
+    u8 *tmd = NULL;
+    size_t tmd_size = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
+    
+    u64 title_id = 0;
+    u32 low_tid = 0;
+    char low_tid_ascii[5] = {0};
+    
     FILE *opening_bnr = NULL;
     u8 *icon_bin = NULL;
     size_t res = 0, imet_icon_bin_size = 0, icon_bin_size = 0;
@@ -35,6 +52,9 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     CntBinImd5Header *imd5_header = NULL;
     u8 imd5_hash[MD5_HASH_SIZE] = {0};
+    
+
+    
     
     
     
@@ -48,8 +68,22 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     printf("Keydata and device certificate successfully loaded.\n\n");
     
     /* Unpack input WAD package. */
-    if (!wadUnpackInstallablePackage(wad_path, tmp_path)) return false;
+    if (!wadUnpackInstallablePackage(wad_path, tmp_path, NULL, NULL, &ticket, &ticket_size, &tmd, &tmd_size)) return false;
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", wad_path);
+    
+    /* Retrieve ticket and TMD common blocks. */
+    tik_common_block = tikGetCommonBlockFromBuffer(ticket, ticket_size, NULL);
+    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
+    
+    /* Get title ID and convert its lower u32 to ASCII. */
+    title_id = bswap_64(tmd_common_block->title_id);
+    low_tid = TITLE_LOWER(title_id);
+    
+    for(u8 i = 0; i < 4; i++)
+    {
+        low_tid_ascii[i] = (char)((u8)(low_tid >> (24 - (i * 8))) & 0xFF);
+        if (low_tid_ascii[i] < 0x20 || low_tid_ascii[i] > 0x7E) low_tid_ascii[i] = '.';
+    }
     
     /* Open 00000000.app content file (opening.bnr). */
     os_snprintf(tmp_path + tmp_path_len, MAX_PATH - tmp_path_len, OS_PATH_SEPARATOR "00000000.app");
@@ -122,6 +156,20 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     utilsPrintHexData("  Hash:                   ", imd5_header->hash, MD5_HASH_SIZE);
     printf("\n");
     
+    /* Generate output path. */
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, CONTENT_PRIVATE_PATH, low_tid_ascii);
+    utilsCreateDirectoryTree(out_path);
+    
+    new_out_path_len = os_strlen(out_path);
+    os_snprintf(out_path + new_out_path_len, MAX_PATH - new_out_path_len, OS_PATH_SEPARATOR CONTENT_NAME);
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
@@ -135,12 +183,24 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     
 out:
-    
     if (icon_bin) free(icon_bin);
     
     if (opening_bnr) fclose(opening_bnr);
     
+    if (tmd) free(tmd);
+    
+    if (ticket) free(ticket);
+    
+    tmp_path[tmp_path_len] = (os_char_t)0;
+    //utilsRemoveDirectoryRecursively(tmp_path);
+    
+    if (!success)
+    {
+        os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "private");
+        //utilsRemoveDirectoryRecursively(out_path);
+    }
+    
+    out_path[out_path_len] = (os_char_t)0;
+    
     return success;
 }
-
-

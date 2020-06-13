@@ -48,7 +48,7 @@
 #define TITLE_TYPE_DISC_BASED_CHANNEL   (u32)0x00010004
 #define TITLE_TYPE_DLC                  (u32)0x00010005
 
-#define SD_CONTENT_PATH_LENGTH          34
+#define SD_CONTENT_PATH_LENGTH          35
 
 void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
@@ -63,5 +63,7 @@ void utilsPrintHexData(const char *msg, const void *data, size_t size);
 void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, size_t size);
 
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
+
+void utilsCreateDirectoryTree(const os_char_t *path);
 
 #endif /* __UTILS_H__ */

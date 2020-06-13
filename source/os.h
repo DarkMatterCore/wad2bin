@@ -60,6 +60,7 @@ typedef struct _stat os_stat_t;
 #define OS_CURRENT_DIR                  L"."
 #define OS_PARENT_DIR                   L".."
 #define OS_PRINT_STR                    "%ls"
+#define OS_PRINT_PRECISION_STR          "%.*ls"
 
 #define os_fopen                        _wfopen
 #define os_fseek                        _fseeki64   /// Point to the right function for large file support.
@@ -67,7 +68,7 @@ typedef struct _stat os_stat_t;
 #define os_strlen                       wcslen
 #define os_strcmp                       wcscmp
 #define os_strncmp                      wcsncmp
-#define os_strcat                       wcscat
+#define os_strchr                       wcschr
 #define os_mkdir(path, mode)            _wmkdir(path)
 #define os_rmdir                        _wrmdir
 #define os_opendir                      _wopendir
@@ -90,6 +91,7 @@ typedef struct stat os_stat_t;
 #define OS_CURRENT_DIR                  "."
 #define OS_PARENT_DIR                   ".."
 #define OS_PRINT_STR                    "%s"
+#define OS_PRINT_PRECISION_STR          "%.*s"
 
 #define os_fopen                        fopen
 #define os_fseek                        fseek       /// Large file support already enabled.
@@ -98,7 +100,7 @@ typedef struct stat os_stat_t;
 #define os_strcmp                       strcmp
 #define os_strncmp                      strncmp
 #define os_snprintf                     snprintf
-#define os_strcat                       strcat
+#define os_strchr                       strchr
 #define os_mkdir                        mkdir
 #define os_rmdir                        rmdir
 #define os_opendir                      opendir
