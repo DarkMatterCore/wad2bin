@@ -60,6 +60,8 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t siz
 
 void utilsPrintHexData(const char *msg, const void *data, size_t size);
 
+void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, size_t size);
+
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
 #endif /* __UTILS_H__ */

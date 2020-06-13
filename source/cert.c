@@ -180,41 +180,41 @@ static bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *
         case SignatureType_Rsa4096Sha1:
         case SignatureType_Rsa4096Sha256:
             offset += sizeof(SignatureBlockRsa4096);
-            if (verbose) printf("Signature type: 0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Rsa2048Sha1:
         case SignatureType_Rsa2048Sha256:
             offset += sizeof(SignatureBlockRsa2048);
-            if (verbose) printf("Signature type: 0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Ecc480Sha1:
         case SignatureType_Ecc480Sha256:
             offset += sizeof(SignatureBlockEcc480);
-            if (verbose) printf("Signature type: 0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Hmac160Sha1:
             offset += sizeof(SignatureBlockHmac160);
-            if (verbose) printf("Signature type: 0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
             break;
         default:
             ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
             return false;
     }
     
-    if (verbose) printf("Signature issuer: %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
+    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
     
     memcpy(&pub_key_type, buf_u8 + offset, sizeof(u32));
     pub_key_type = bswap_32(pub_key_type);
     offset += MEMBER_SIZE(CertCommonBlock, pub_key_type);
     
-    if (verbose) printf("Name: %.*s.\n", (int)MEMBER_SIZE(CertCommonBlock, name), (const char*)(buf_u8 + offset));
+    if (verbose) printf("  Name:                   %.*s.\n", (int)MEMBER_SIZE(CertCommonBlock, name), (const char*)(buf_u8 + offset));
     offset += MEMBER_SIZE(CertCommonBlock, name);
     
     if (verbose)
     {
         memcpy(&date, buf_u8 + offset, sizeof(u32));
         date = bswap_32(date);
-        printf("Date: 0x%08" PRIx32 ".\n", date);
+        printf("  Date:                   0x%08" PRIx32 ".\n", date);
     }
     
     offset += MEMBER_SIZE(CertCommonBlock, date);
@@ -223,15 +223,15 @@ static bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *
     {
         case CertPubKeyType_Rsa4096:
             offset += sizeof(CertPublicKeyBlockRsa4096);
-            if (verbose) printf("Public key type: 0x%08" PRIx32 " (RSA-4096).\n", pub_key_type);
+            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (RSA-4096).\n", pub_key_type);
             break;
         case CertPubKeyType_Rsa2048:
             offset += sizeof(CertPublicKeyBlockRsa2048);
-            if (verbose) printf("Public key type: 0x%08" PRIx32 " (RSA-2048).\n", pub_key_type);
+            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (RSA-2048).\n", pub_key_type);
             break;
         case CertPubKeyType_Ecc480:
             offset += sizeof(CertPublicKeyBlockEcc480);
-            if (verbose) printf("Public key type: 0x%08" PRIx32 " (ECC-B233).\n", pub_key_type);
+            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (ECC-B233).\n", pub_key_type);
             break;
         default:
             ERROR_MSG("\nInvalid public key type value! (0x%08" PRIx32 ").", pub_key_type);

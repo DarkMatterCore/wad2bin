@@ -216,31 +216,31 @@ bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_ty
         case SignatureType_Rsa4096Sha256:
             type = TmdType_SigRsa4096;
             offset += sizeof(SignatureBlockRsa4096);
-            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Rsa2048Sha1:
         case SignatureType_Rsa2048Sha256:
             type = TmdType_SigRsa2048;
             offset += sizeof(SignatureBlockRsa2048);
-            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Ecc480Sha1:
         case SignatureType_Ecc480Sha256:
             type = TmdType_SigEcc480;
             offset += sizeof(SignatureBlockEcc480);
-            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Hmac160Sha1:
             type = TmdType_SigHmac160;
             offset += sizeof(SignatureBlockHmac160);
-            if (verbose) printf("TMD signature type: 0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
             break;
         default:
             ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
             return false;
     }
     
-    if (verbose) printf("TMD signature issuer: %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
+    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
     
     tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
     offset += sizeof(TmdCommonBlock);

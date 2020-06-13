@@ -27,21 +27,33 @@
 #include "wad.h"
 #include "crypto.h"
 
-#define IMET_MAGIC  (u32)0x494D4554 /* "IMET". */
+#define IMET_MAGIC              (u32)0x494D4554 /* "IMET". */
+#define IMET_HASHED_AREA_SIZE   (u32)0x600
+#define IMET_FILE_COUNT         (u32)3
+#define IMET_NAME_LENGTH        42
+
+#define IMD5_MAGIC              (u32)0x494D4435 /* "IMD5". */
 
 typedef struct {
     u8 padding_1[0x40];
-    u32 magic;                      ///< IMET_MAGIC.
-    u32 hash_size;                  ///< Hashed area size. Always set to 0x600.
-    u32 file_count;                 ///< Always set to 3 (icon.bin, banner.bin, sound.bin).
-    u32 icon_bin_size;              ///< icon.bin size.
-    u32 banner_bin_size;            ///< banner.bin size.
-    u32 sound_bin_size;             ///< sound.bin size.
+    u32 magic;                          ///< IMET_MAGIC.
+    u32 hash_size;                      ///< Hashed area size. Always set to IMET_HASHED_AREA_SIZE.
+    u32 file_count;                     ///< Always set to IMET_FILE_COUNT (icon.bin, banner.bin, sound.bin).
+    u32 icon_bin_size;                  ///< icon.bin size (decompressed).
+    u32 banner_bin_size;                ///< banner.bin size (decompressed).
+    u32 sound_bin_size;                 ///< sound.bin size (decompressed).
     u8 reserved[0x04];
-    u16 names[10][42];              ///< Title names in different languages (Japanese, English, German, French, Spanish, Italian, Dutch, unknown, unknown, Korean). Encoded using UTF-16BE.
+    u16 names[10][IMET_NAME_LENGTH];    ///< Title names in different languages (Japanese, English, German, French, Spanish, Italian, Dutch, unknown, unknown, Korean). Encoded using UTF-16BE.
     u8 padding_2[0x24C];
-    u8 imet_hash[MD5_HASH_SIZE];    ///< MD5 hash from the magic word to hash_size. This field must be set to zeroes when calculating the hash.
-} BannerImetHeader;
+    u8 hash[MD5_HASH_SIZE];             ///< MD5 hash from the magic word to hash_size. This field must be set to zeroes when calculating the hash.
+} CntBinImetHeader;
+
+typedef struct {
+    u32 magic;              ///< IMD5_MAGIC.
+    u32 data_size;          ///< Data size after this header.
+    u8 reserved[0x08];
+    u8 hash[MD5_HASH_SIZE]; ///< MD5 hash calculated over IMD5 data after this header.
+} CntBinImd5Header;
 
 /// content.bin encrypted header, also known as Part A.
 /// This is followed by an encrypted copy of the icon.bin portion from the title's opening.bnr, which is known as Part B and has a variable size.
@@ -58,26 +70,9 @@ typedef struct {
     u32 unknown_lower_tid;              ///< Lower ID from another title (unknown purpose).
     u64 ref_title_id_1;                 ///< Full ID from another title (unknown purpose).
     u64 ref_title_id_2;                 ///< Full ID from another title (unknown purpose).
-    BannerImetHeader imet_header;       ///< IMET header.
+    CntBinImetHeader imet_header;       ///< IMET header.
 } CntBinHeader;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, const os_char_t *out_path, os_char_t *tmp_path, size_t tmp_path_len);
 
 #endif /* __CNTBIN_H__ */

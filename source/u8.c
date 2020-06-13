@@ -365,6 +365,53 @@ u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size)
     return buf;
 }
 
+u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, size_t *out_size)
+{
+    if (!u8_fd || !file_path || !strlen(file_path) || !out_size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return NULL;
+    }
+    
+    U8Context u8_ctx = {0};
+    
+    u32 node_idx = 0;
+    U8Node *node = NULL;
+    
+    u8 *file_data = NULL;
+    size_t file_size = 0;
+    
+    /* Initialize U8 context. */
+    if (!u8ContextInit(u8_fd, &u8_ctx))
+    {
+        ERROR_MSG("Failed to initialize U8 context!");
+        return NULL;
+    }
+    
+    /* Retrieve U8 file node by path. */
+    node = u8GetFileNodeByPath(&u8_ctx, file_path, &node_idx);
+    if (!node)
+    {
+        ERROR_MSG("Failed to retrieve U8 node for \"%s\"!", file_path);
+        goto out;
+    }
+    
+    /* Load U8 file data. */
+    file_data = u8LoadFileData(&u8_ctx, node, &file_size);
+    if (!file_data)
+    {
+        ERROR_MSG("Failed to load U8 file data for \"%s\"!", file_path);
+        goto out;
+    }
+    
+    *out_size = file_size;
+    
+out:
+    u8ContextFree(&u8_ctx);
+    
+    return file_data;
+}
+
 static U8Node *u8GetChildNodeByName(U8Context *ctx, U8Node *dir_node, u32 *node_idx, const char *name, u8 type)
 {
     size_t name_len = 0;

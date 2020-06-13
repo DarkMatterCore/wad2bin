@@ -76,6 +76,9 @@ U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
 /// The returned pointer must be freed by the user.
 u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size);
 
+/// Simple all-in-one function to load file data from an U8 archive by its internal path.
+u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, size_t *out_size);
+
 /// Byteswaps fields from an U8 header.
 ALWAYS_INLINE void u8ByteswapHeaderFields(U8Header *u8_header)
 {

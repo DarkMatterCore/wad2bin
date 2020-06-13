@@ -20,13 +20,7 @@
  */
 
 #include "utils.h"
-#include "keys.h"
-#include "wad.h"
-
-
-#include "u8.h"
-
-
+#include "cntbin.h"
 
 #define ARG_COUNT   4
 
@@ -34,11 +28,10 @@ int main(int argc, char **argv)
 {
     int ret = 0;
     
-    os_char_t *paths[ARG_COUNT] = {0};
-    
-    os_char_t wad_output_dir[0x20] = {0};
-    os_snprintf(wad_output_dir, MAX_ELEMENTS(wad_output_dir), "." OS_PATH_SEPARATOR "wad2cntbin_unpacked_wad");
-    os_mkdir(wad_output_dir, 0777);
+    /* Reserve memory for an extra temporary path. */
+    os_char_t *paths[ARG_COUNT + 1] = {0};
+    size_t tmp_path_len = 0;
+    bool res = false;
     
     printf("\nwad2cntbin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
@@ -54,7 +47,7 @@ int main(int argc, char **argv)
     }
     
     /* Generate path buffers. */
-    for(u32 i = 0; i < ARG_COUNT; i++)
+    for(u32 i = 0; i <= ARG_COUNT; i++)
     {
         /* Allocate memory for the current path. */
         paths[i] = calloc(MAX_PATH, sizeof(os_char_t));
@@ -65,100 +58,47 @@ int main(int argc, char **argv)
             goto out;
         }
         
-        size_t path_len = strlen(argv[i + 1]);
-        
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-        /* Convert current path string to UTF-16. */
-        /* We'll only need to perform manual conversion at this point. */
-        if (!utilsConvertUTF8ToUTF16(paths[i], argv[i + 1]))
+        if (i == ARG_COUNT)
         {
-            ERROR_MSG("Failed to convert path from UTF-8 to UTF-16!");
-            ret = -3;
-            goto out;
-        }
+            /* Save temporary path and create it. */
+            os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2cntbin_wad_data");
+            tmp_path_len = os_strlen(paths[i]);
+            os_mkdir(paths[i], 0777);
+        } else {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+            /* Convert current path string to UTF-16. */
+            /* We'll only need to perform manual conversion at this point. */
+            if (!utilsConvertUTF8ToUTF16(paths[i], argv[i + 1]))
+            {
+                ERROR_MSG("Failed to convert path from UTF-8 to UTF-16!");
+                ret = -3;
+                goto out;
+            }
 #else
-        /* Copy path. */
-        os_snprintf(paths[i], MAX_PATH, argv[i + 1]);
+            /* Copy path. */
+            os_snprintf(paths[i], MAX_PATH, argv[i + 1]);
 #endif
-        
-        /* Check if the output directory string ends with a path separator. */
-        /* If so, remove it. */
-        if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
+            
+            /* Check if the output directory string ends with a path separator. */
+            /* If so, remove it. */
+            size_t path_len = strlen(argv[i + 1]);
+            if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
+        }
     }
     
-    /* Load keydata and device certificate. */
-    if (!keysLoadKeyDataAndDeviceCert(paths[0], paths[1]))
+    /* Start conversion procedure. */
+    res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4], tmp_path_len);
+    paths[4][tmp_path_len] = (os_char_t)0;
+    if (!res)
     {
         ret = -4;
         goto out;
     }
     
-    printf("Keydata and device certificate successfully loaded.\n\n");
-    
-    /* Unpack input WAD package. */
-    if (!wadUnpackInstallablePackage(paths[2], wad_output_dir))
-    {
-        ret = -5;
-        goto out;
-    }
-    
-    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
-    
-    
-    
-    os_char_t bnr_path[MAX_PATH] = {0};
-    os_snprintf(bnr_path, MAX_PATH, OS_PRINT_STR OS_PATH_SEPARATOR "00000000.app", wad_output_dir);
-    
-    FILE *opening_bnr = os_fopen(bnr_path, OS_MODE_READ);
-    if (opening_bnr)
-    {
-        os_fseek(opening_bnr, 0x640, SEEK_SET);
-        
-        U8Context u8_ctx = {0};
-        if (u8ContextInit(opening_bnr, &u8_ctx))
-        {
-            u32 node_idx = 0;
-            U8Node *node = NULL;
-            if ((node = u8GetFileNodeByPath(&u8_ctx, "/meta/icon.bin", &node_idx)))
-            {
-                size_t icon_bin_size = 0;
-                u8 *icon_bin = u8LoadFileData(&u8_ctx, node, &icon_bin_size);
-                if (icon_bin)
-                {
-                    os_snprintf(bnr_path, MAX_PATH, OS_PRINT_STR OS_PATH_SEPARATOR "icon.bin", wad_output_dir);
-                    if (utilsWriteDataToFile(bnr_path, icon_bin, icon_bin_size)) printf("icon.bin saved.\n\n");
-                    free(icon_bin);
-                }
-            }
-            
-            u8ContextFree(&u8_ctx);
-        }
-        
-        fclose(opening_bnr);
-    }
-    
-    
-    
-    
-    
-    /* Generate content.bin file. */
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 out:
-    //utilsRemoveDirectoryRecursively(wad_output_dir);
+    //if (paths[4]) utilsRemoveDirectoryRecursively(paths[4]);
     
-    for(u32 i = 0; i < ARG_COUNT; i++)
+    for(u32 i = 0; i <= ARG_COUNT; i++)
     {
         if (paths[i]) free(paths[i]);
     }
