@@ -24,6 +24,8 @@
 
 #define U8_FILE_ALIGNMENT   0x20
 
+static U8Node *u8GetChildNodeByName(U8Context *ctx, U8Node *dir_node, u32 *node_idx, const char *name, u8 type);
+
 bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
 {
     if (!u8_fd || !ctx)
@@ -208,22 +210,180 @@ out:
     return success;
 }
 
-
-
-
-
-u8 *u8LoadFileDataFromU8ArchiveByPath(U8Context *ctx, const char *file_path, size_t *out_size)
+void u8ContextFree(U8Context *ctx)
 {
-    if (!ctx || !file_path || !strlen(file_path) || !out_size)
+    if (!ctx) return;
+    if (ctx->nodes) free(ctx->nodes);
+    if (ctx->str_table) free(ctx->str_table);
+    memset(ctx, 0, sizeof(U8Context));
+}
+
+U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
+{
+    size_t path_len = 0;
+    char *path_dup = NULL, *pch = NULL;
+    U8Node *dir_node = NULL;
+    u32 node_idx = 0;
+    
+    if (!ctx || !ctx->str_table || !path || *path != '/' || !(path_len = strlen(path)) || !out_node_idx || !(dir_node = u8GetNodeByOffset(ctx, 0)))
     {
         ERROR_MSG("Invalid parameters!");
         return NULL;
     }
     
+    /* Check if the root directory was requested. */
+    if (path_len == 1) return dir_node;
     
+    /* Duplicate path to avoid problems with strtok(). */
+    if (!(path_dup = strdup(path)))
+    {
+        ERROR_MSG("Unable to duplicate input path!");
+        return NULL;
+    }
     
+    pch = strtok(path_dup, "/");
+    if (!pch)
+    {
+        ERROR_MSG("Failed to tokenize input path!");
+        dir_node = NULL;
+        goto out;
+    }
+    
+    while(pch)
+    {
+        if (!(dir_node = u8GetChildNodeByName(ctx, dir_node, &node_idx, pch, U8NodeType_Directory)))
+        {
+            ERROR_MSG("Failed to retrieve directory node by name!");
+            goto out;
+        }
+        
+        pch = strtok(NULL, "/");
+    }
+    
+    *out_node_idx = node_idx;
+    
+out:
+    if (path_dup) free(path_dup);
+    
+    return dir_node;
+}
+
+U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
+{
+    size_t path_len = 0;
+    char *path_dup = NULL, *filename = NULL;
+    U8Node *dir_node = NULL, *file_node = NULL;
+    u32 node_idx = 0;
+    
+    if (!ctx || !ctx->str_table || !path || *path != '/' || (path_len = strlen(path)) <= 1 || !out_node_idx)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return NULL;
+    }
+    
+    /* Duplicate path. */
+    if (!(path_dup = strdup(path)))
+    {
+        ERROR_MSG("Unable to duplicate input path!");
+        return NULL;
+    }
+    
+    /* Remove any trailing slashes. */
+    while(path_dup[path_len - 1] == '/')
+    {
+        path_dup[path_len - 1] = '\0';
+        path_len--;
+    }
+    
+    /* Safety check. */
+    if (!path_len || !(filename = strrchr(path_dup, '/')))
+    {
+        ERROR_MSG("Invalid input path!");
+        goto out;
+    }
+    
+    /* Remove leading slash and adjust filename string pointer. */
+    *filename++ = '\0';
+    
+    /* Retrieve directory node. */
+    /* If the first character is NULL, then just retrieve the root directory node. */
+    if (!(dir_node = (*path_dup ? u8GetDirectoryNodeByPath(ctx, path_dup, &node_idx) : u8GetNodeByOffset(ctx, 0))))
+    {
+        ERROR_MSG("Failed to retrieve directory node!");
+        goto out;
+    }
+    
+    /* Retrieve file node. */
+    if (!(file_node = u8GetChildNodeByName(ctx, dir_node, &node_idx, filename, U8NodeType_File)))
+    {
+        ERROR_MSG("Failed to retrieve file node by name!");
+        goto out;
+    }
+    
+    *out_node_idx = node_idx;
+    
+out:
+    if (path_dup) free(path_dup);
+    
+    return file_node;
+}
+
+u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size)
+{
+    if (!ctx || !ctx->u8_fd || !ctx->u8_header.data_offset || !file_node || file_node->properties.type != U8NodeType_File || file_node->data_offset < ctx->u8_header.data_offset || \
+        !file_node->size || !out_size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return NULL;
+    }
+    
+    u8 *buf = NULL;
+    size_t res = 0;
+    
+    /* Allocate memory for the file buffer. */
+    buf = malloc(file_node->size);
+    if (!buf)
+    {
+        ERROR_MSG("Error allocating memory for file buffer!");
+        return NULL;
+    }
+    
+    /* Update file stream position. */
+    os_fseek(ctx->u8_fd, ctx->header_offset + file_node->data_offset, SEEK_SET);
+    
+    /* Read file data. */
+    res = fread(buf, 1, file_node->size, ctx->u8_fd);
+    if (res == file_node->size)
+    {
+        *out_size = file_node->size;
+    } else {
+        ERROR_MSG("Failed to read file data from U8 node!");
+        free(buf);
+        buf = NULL;
+    }
+    
+    return buf;
+}
+
+static U8Node *u8GetChildNodeByName(U8Context *ctx, U8Node *dir_node, u32 *node_idx, const char *name, u8 type)
+{
+    size_t name_len = 0;
+    
+    if (!ctx || !ctx->nodes || !ctx->str_table || !dir_node || dir_node->properties.type != U8NodeType_Directory || !node_idx || *node_idx >= ctx->node_count || (*node_idx + 1) >= dir_node->size || \
+        !name || !(name_len = strlen(name)) || (type != U8NodeType_File && type != U8NodeType_Directory)) return NULL;
+    
+    for(u32 i = (*node_idx + 1); i < dir_node->size; i++)
+    {
+        char *node_name = (ctx->str_table + ctx->nodes[i].properties.name_offset);
+        
+        if (ctx->nodes[i].properties.type != type || strlen(node_name) != name_len) continue;
+        
+        if (!strcmp(node_name, name))
+        {
+            *node_idx = i;
+            return &(ctx->nodes[i]);
+        }
+    }
     
     return NULL;
-    
-    
 }

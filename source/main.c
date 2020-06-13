@@ -117,9 +117,18 @@ int main(int argc, char **argv)
         U8Context u8_ctx = {0};
         if (u8ContextInit(opening_bnr, &u8_ctx))
         {
-            for(u32 i = 0; i < u8_ctx.node_count; i++)
+            u32 node_idx = 0;
+            U8Node *node = NULL;
+            if ((node = u8GetFileNodeByPath(&u8_ctx, "/meta/icon.bin", &node_idx)))
             {
-                printf("%s\n", u8_ctx.str_table + u8_ctx.nodes[i].properties.name_offset);
+                size_t icon_bin_size = 0;
+                u8 *icon_bin = u8LoadFileData(&u8_ctx, node, &icon_bin_size);
+                if (icon_bin)
+                {
+                    os_snprintf(bnr_path, MAX_PATH, OS_PRINT_STR OS_PATH_SEPARATOR "icon.bin", wad_output_dir);
+                    if (utilsWriteDataToFile(bnr_path, icon_bin, icon_bin_size)) printf("icon.bin saved.\n\n");
+                    free(icon_bin);
+                }
             }
             
             u8ContextFree(&u8_ctx);

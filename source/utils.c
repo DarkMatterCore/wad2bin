@@ -158,7 +158,7 @@ void utilsPrintHexData(const char *msg, const void *data, size_t size)
     
     const u8 *data_u8 = (const u8*)data;
     
-    for(size_t i = 0; i < size; i++) printf("%x", data_u8[i]);
+    for(size_t i = 0; i < size; i++) printf("%02" PRIx8, data_u8[i]);
     
     printf(".\n");
 }

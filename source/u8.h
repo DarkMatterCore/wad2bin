@@ -58,16 +58,25 @@ typedef struct {
     char *str_table;
 } U8Context;
 
+/// Initializes an U8 context.
 bool u8ContextInit(FILE *u8_fd, U8Context *ctx);
 
-ALWAYS_INLINE void u8ContextFree(U8Context *ctx)
-{
-    if (!ctx) return;
-    if (ctx->nodes) free(ctx->nodes);
-    if (ctx->str_table) free(ctx->str_table);
-    memset(ctx, 0, sizeof(U8Context));
-}
+/// Frees an U8 context.
+void u8ContextFree(U8Context *ctx);
 
+/// Retrieves an U8 directory node by its path.
+/// Its index is saved to the out_node_idx pointer.
+U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
+
+/// Retrieves an U8 file node by its path.
+/// Its index is saved to the out_node_idx pointer.
+U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
+
+/// Loads file data from an U8 file node into memory.
+/// The returned pointer must be freed by the user.
+u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size);
+
+/// Byteswaps fields from an U8 header.
 ALWAYS_INLINE void u8ByteswapHeaderFields(U8Header *u8_header)
 {
     if (!u8_header || IS_BIG_ENDIAN) return;
@@ -77,13 +86,22 @@ ALWAYS_INLINE void u8ByteswapHeaderFields(U8Header *u8_header)
     u8_header->data_offset = __builtin_bswap32(u8_header->data_offset);
 }
 
+/// Byteswaps fields from an U8 node.
 ALWAYS_INLINE void u8ByteswapNodeFields(U8Node *u8_node)
 {
     if (!u8_node || IS_BIG_ENDIAN) return;
-    /* Perform a bitshift to the left to make the byteswap return the desired result. */
+    /* Perform a bitwise left shift to make the byteswap return the desired result. */
     u8_node->properties.name_offset = __builtin_bswap32(u8_node->properties.name_offset << 8);
     u8_node->data_offset = __builtin_bswap32(u8_node->data_offset);
     u8_node->size = __builtin_bswap32(u8_node->size);
+}
+
+/// Retrieves an U8 node by its offset.
+ALWAYS_INLINE U8Node *u8GetNodeByOffset(U8Context *ctx, u32 offset)
+{
+    u32 node_idx = 0;
+    if (!ctx || !ctx->nodes || !IS_ALIGNED(offset, sizeof(U8Node)) || (node_idx = (u32)(offset / sizeof(U8Node))) >= ctx->node_count) return NULL;
+    return &(ctx->nodes[node_idx]);
 }
 
 #endif /* __U8_H__ */
