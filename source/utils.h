@@ -66,4 +66,6 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
 void utilsCreateDirectoryTree(const os_char_t *path);
 
+size_t utilsWritePadding(FILE *fd, size_t size, size_t alignment);
+
 #endif /* __UTILS_H__ */

@@ -36,6 +36,7 @@ u8 *keysGetWiiKoreanKey(void);
 u8 *keysGetVirtualWiiCommonKey(void);
 u8 *keysGetSdKey(void);
 u8 *keysGetSdIv(void);
+u8 *keysGetMd5Blanker(void);
 u32 keysGetConsoleId(void);
 u8 *keysGetPrngKey(void);
 u8 *keysGetEccPrivateKey(void);

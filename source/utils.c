@@ -270,3 +270,33 @@ void utilsCreateDirectoryTree(const os_char_t *path)
     
     os_mkdir(path, 0777);
 }
+
+size_t utilsWritePadding(FILE *fd, size_t size, size_t alignment)
+{
+    if (!fd || !size || !alignment)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return 0;
+    }
+    
+    u8 *pad = NULL;
+    size_t res = 0, pad_size = 0, new_size = 0;
+    
+    if (IS_ALIGNED(size, alignment)) return size;
+    
+    pad_size = (ALIGN_UP(size, alignment) - size);
+    
+    pad = calloc(pad_size, sizeof(u8));
+    if (!pad)
+    {
+        ERROR_MSG("Error allocating memory for pad block!");
+        return 0;
+    }
+    
+    res = fwrite(pad, 1, pad_size, fd);
+    new_size = (res == pad_size ? (size + pad_size) : 0);
+    
+    free(pad);
+    
+    return new_size;
+}

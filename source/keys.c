@@ -88,6 +88,16 @@ static KeysEntryInfo g_keyData[] = {
         .retrieved = false
     },
     {
+        ///< MD5 Blanker. Stored in the System Menu binary. Used as a placeholder for hash fields during MD5 hash calculations of SD card data.
+        .name = "md5_blanker",
+        .key = {0},
+        .key_size = MD5_HASH_SIZE,
+        .hash = { 0x3D, 0xAB, 0xA9, 0xEF, 0x67, 0xCA, 0x94, 0xBF, 0x08, 0x28, 0xEC, 0x04, 0x39, 0x4A, 0x53, 0x13, 0x4D, 0x33, 0x1C, 0x1F },
+        .console_specific = false,
+        .mandatory = true,
+        .retrieved = false
+    },
+    {
         ///< Console ID. Console specific, found in OTP dumps @ 0x24. Used as part of the backup WAD package header in content.bin files.
         .name = "console_id",
         .key = {0},
@@ -185,13 +195,18 @@ u8 *keysGetSdIv(void)
     return (g_keyData[4].retrieved ? g_keyData[4].key : NULL);
 }
 
+u8 *keysGetMd5Blanker(void)
+{
+    return (g_keyData[5].retrieved ? g_keyData[5].key : NULL);
+}
+
 u32 keysGetConsoleId(void)
 {
-    if (!g_keyData[5].retrieved) return 0;
+    if (!g_keyData[6].retrieved) return 0;
     
     /* Byteswap console ID. */
     u32 console_id = 0;
-    memcpy(&console_id, g_keyData[5].key, sizeof(u32));
+    memcpy(&console_id, g_keyData[6].key, sizeof(u32));
     console_id = bswap_32(console_id);
     
     return console_id;
@@ -199,12 +214,12 @@ u32 keysGetConsoleId(void)
 
 u8 *keysGetPrngKey(void)
 {
-    return (g_keyData[6].retrieved ? g_keyData[6].key : NULL);
+    return (g_keyData[7].retrieved ? g_keyData[7].key : NULL);
 }
 
 u8 *keysGetEccPrivateKey(void)
 {
-    return (g_keyData[7].retrieved ? g_keyData[7].key : NULL);
+    return (g_keyData[8].retrieved ? g_keyData[8].key : NULL);
 }
 
 CertSigEcc480PubKeyEcc480 *keysGetDeviceCertificate(void)

@@ -26,10 +26,19 @@
 #include "tmd.h"
 #include "cntbin.h"
 
+#define CONTENT_PRIVATE_PATH    OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR "title" OS_PATH_SEPARATOR "%s" /* "%s" gets replaced by the ASCII conversion of the TID lower u32 */
+#define CONTENT_NAME            "content.bin"
+
+#define UNKNOWN_LOW_TID         (u32)0x57444645         /* "WDFE". Used by BannerBomb. */
+#define REF_TID_1               (u64)0x0001000157424D45 /* 10001-WBME. Used by BannerBomb. */
+#define REF_TID_2               (u64)0x000100014E414A4E /* 10001-NAJN. Used by BannerBomb. */
+
 bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, os_char_t *out_path, os_char_t *tmp_path)
 {
     size_t out_path_len = os_strlen(out_path), new_out_path_len = 0;
     size_t tmp_path_len = os_strlen(tmp_path);
+    
+    u8 *sd_key = NULL, *sd_iv = NULL, *md5_blanker = NULL, *prng_key = NULL;
     
     u8 *ticket = NULL;
     size_t ticket_size = 0;
@@ -44,16 +53,19 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     char low_tid_ascii[5] = {0};
     
     FILE *opening_bnr = NULL;
-    u8 *icon_bin = NULL;
-    size_t res = 0, imet_icon_bin_size = 0, icon_bin_size = 0;
+    u8 *icon_bin = NULL, *tmp_icon_bin = NULL;
+    size_t res = 0, icon_bin_size = 0;
     
     CntBinHeader cntbin_header = {0};
-    u8 imet_hash[MD5_HASH_SIZE] = {0}, calc_imet_hash[MD5_HASH_SIZE] = {0};
+    u8 imet_hash[MD5_HASH_SIZE] = {0}, calc_imet_hash[MD5_HASH_SIZE] = {0}, cntbin_header_hash[MD5_HASH_SIZE] = {0};
     
     CntBinImd5Header *imd5_header = NULL;
     u8 imd5_hash[MD5_HASH_SIZE] = {0};
     
-
+    FILE *content_bin = NULL;
+    size_t content_bin_offset = 0;
+    
+    
     
     
     
@@ -66,6 +78,12 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     /* Load keydata and device certificate. */
     if (!keysLoadKeyDataAndDeviceCert(keys_file_path, device_cert_path)) return false;
     printf("Keydata and device certificate successfully loaded.\n\n");
+    
+    /* Retrieve required keydata */
+    sd_key = keysGetSdKey();
+    sd_iv = keysGetSdIv();
+    md5_blanker = keysGetMd5Blanker();
+    prng_key = keysGetPrngKey();
     
     /* Unpack input WAD package. */
     if (!wadUnpackInstallablePackage(wad_path, tmp_path, NULL, NULL, &ticket, &ticket_size, &tmd, &tmd_size)) return false;
@@ -103,6 +121,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     }
     
     /* Copy IMET hash and wipe it from the IMET header. */
+    /* The IMET header from content.bin files doesn't have this hash. */
     memcpy(imet_hash, cntbin_header.imet_header.hash, MD5_HASH_SIZE);
     memset(cntbin_header.imet_header.hash, 0, MD5_HASH_SIZE);
     
@@ -111,7 +130,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     /* Check IMET header fields. */
     if (cntbin_header.imet_header.magic != bswap_32(IMET_MAGIC) || cntbin_header.imet_header.hash_size != bswap_32(IMET_HASHED_AREA_SIZE) || \
-        cntbin_header.imet_header.file_count != bswap_32(IMET_FILE_COUNT) || !(imet_icon_bin_size = bswap_32(cntbin_header.imet_header.icon_bin_size)) || !cntbin_header.imet_header.banner_bin_size || \
+        cntbin_header.imet_header.file_count != bswap_32(IMET_FILE_COUNT) || !cntbin_header.imet_header.icon_bin_size || !cntbin_header.imet_header.banner_bin_size || \
         !cntbin_header.imet_header.sound_bin_size || memcmp(imet_hash, calc_imet_hash, MD5_HASH_SIZE) != 0)
     {
         ERROR_MSG("Invalid IMET header in \"" OS_PRINT_STR "\"!", tmp_path);
@@ -120,7 +139,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     /* Print IMET information. */
     printf("IMET header:\n");
-    printf("  icon.bin size:          0x%" PRIx64 " (decompressed).\n", imet_icon_bin_size);
+    printf("  icon.bin size:          0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.icon_bin_size));
     printf("  banner.bin size:        0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.banner_bin_size));
     printf("  sound.bin size:         0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.sound_bin_size));
     utilsPrintHexData("  Hash:                   ", imet_hash, MD5_HASH_SIZE);
@@ -163,6 +182,101 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     new_out_path_len = os_strlen(out_path);
     os_snprintf(out_path + new_out_path_len, MAX_PATH - new_out_path_len, OS_PATH_SEPARATOR CONTENT_NAME);
     
+    /* Open content.bin file. */
+    content_bin = os_fopen(out_path, OS_MODE_WRITE);
+    if (!content_bin)
+    {
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        goto out;
+    }
+    
+    /* Update content.bin header (Part A). */
+    cntbin_header.title_id = tmd_common_block->title_id;
+    cntbin_header.icon_bin_size = bswap_32((u32)icon_bin_size);
+    memcpy(cntbin_header.header_hash, md5_blanker, MD5_HASH_SIZE);
+    mbedtls_md5(icon_bin, icon_bin_size, cntbin_header.icon_bin_hash);
+    cntbin_header.unknown_low_tid = bswap_32(UNKNOWN_LOW_TID);
+    cntbin_header.ref_title_id_1 = bswap_64(REF_TID_1);
+    cntbin_header.ref_title_id_2 = bswap_64(REF_TID_2);
+    
+    /* Calculate header hash. */
+    mbedtls_md5((u8*)&cntbin_header, sizeof(CntBinHeader), cntbin_header_hash);
+    memcpy(cntbin_header.header_hash, cntbin_header_hash, MD5_HASH_SIZE);
+    
+    /* Print content.bin header (Part A) information. */
+    printf("content.bin header (Part A - decrypted):\n");
+    printf("  Title ID:               %016" PRIx64 ".\n", bswap_64(cntbin_header.title_id));
+    printf("  icon.bin size:          0x%" PRIx32 ".\n", bswap_32(cntbin_header.icon_bin_size));
+    utilsPrintHexData("  Hash:                   ", cntbin_header.header_hash, MD5_HASH_SIZE);
+    utilsPrintHexData("  icon.bin hash:          ", cntbin_header.icon_bin_hash, MD5_HASH_SIZE);
+    printf("\n");
+    
+    /* Encrypt header (Part A) in-place. */
+    if (!cryptoAes128CbcCrypt(sd_key, sd_iv, &cntbin_header, &cntbin_header, sizeof(CntBinHeader), true))
+    {
+        ERROR_MSG("Failed to encrypt header (Part A) for \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Write encrypted content.bin header (Part A). */
+    res = fwrite(&cntbin_header, 1, sizeof(CntBinHeader), content_bin);
+    if (res != sizeof(CntBinHeader))
+    {
+        ERROR_MSG("Failed to write encrypted header (Part A) to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Update content.bin offset. */
+    content_bin_offset += sizeof(CntBinHeader);
+    
+    /* Reallocate icon.bin buffer (if necessary). */
+    /* We need to do this if the icon.bin size isn't aligned to the AES block size. */
+    if (!IS_ALIGNED(icon_bin_size, AES_BLOCK_SIZE))
+    {
+        size_t aligned_icon_bin_size = ALIGN_UP(icon_bin_size, AES_BLOCK_SIZE);
+        
+        tmp_icon_bin = realloc(icon_bin, aligned_icon_bin_size);
+        if (!tmp_icon_bin)
+        {
+            ERROR_MSG("Error reallocating icon.bin buffer!");
+            goto out;
+        }
+        
+        icon_bin = tmp_icon_bin;
+        tmp_icon_bin = NULL;
+        
+        memset(icon_bin + icon_bin_size, 0, aligned_icon_bin_size - icon_bin_size);
+        icon_bin_size = aligned_icon_bin_size;
+    }
+    
+    /* Encrypt icon.bin (Part B) in-place. */
+    if (!cryptoAes128CbcCrypt(sd_key, sd_iv, icon_bin, icon_bin, icon_bin_size, true))
+    {
+        ERROR_MSG("Failed to encrypt icon.bin (Part B) for \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Write encrypted icon.bin (Part B). */
+    res = fwrite(icon_bin, 1, icon_bin_size, content_bin);
+    if (res != icon_bin_size)
+    {
+        ERROR_MSG("Failed to write encrypted icon.bin (Part B) to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Update content.bin offset. */
+    content_bin_offset += icon_bin_size;
+    
+    /* Write padding if necessary. */
+    if (!(content_bin_offset = utilsWritePadding(content_bin, content_bin_offset, WAD_BLOCK_ALIGNMENT)))
+    {
+        ERROR_MSG("Failed to write pad block at offset 0x%" PRIx64 " in \"" OS_PRINT_STR "\"!", content_bin_offset, out_path);
+        goto out;
+    }
+    
+    
+    
+    
     
     
     
@@ -183,6 +297,8 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     
 out:
+    if (content_bin) fclose(content_bin);
+    
     if (icon_bin) free(icon_bin);
     
     if (opening_bnr) fclose(opening_bnr);

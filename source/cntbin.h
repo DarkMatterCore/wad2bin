@@ -27,15 +27,12 @@
 #include "wad.h"
 #include "crypto.h"
 
-#define IMET_MAGIC              (u32)0x494D4554 /* "IMET". */
+#define IMET_MAGIC              (u32)0x494D4554         /* "IMET". */
 #define IMET_HASHED_AREA_SIZE   (u32)0x600
 #define IMET_FILE_COUNT         (u32)3
 #define IMET_NAME_LENGTH        42
 
-#define IMD5_MAGIC              (u32)0x494D4435 /* "IMD5". */
-
-#define CONTENT_PRIVATE_PATH    OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR "title" OS_PATH_SEPARATOR "%s" /* "%s" gets replaced by the ASCII conversion of the TID lower u32 */
-#define CONTENT_NAME            "content.bin"
+#define IMD5_MAGIC              (u32)0x494D4435         /* "IMD5". */
 
 typedef struct {
     u8 padding_1[0x40];
@@ -67,10 +64,10 @@ typedef struct {
 /// Each part from a content.bin file must be aligned to a 64-byte boundary, using zeroes to pad data if necessary (except for the end of Part D and the start of Part E).
 typedef struct {
     u64 title_id;                       ///< Title ID.
-    u32 icon_area_size;                 ///< Encrypted icon.bin area size.
+    u32 icon_bin_size;                  ///< Decrypted icon.bin size. Align to AES_BLOCK_SIZE to get the Part B size.
     u8 header_hash[MD5_HASH_SIZE];      ///< MD5 hash of the header with this field set to zeroes.
-    u8 icon_area_hash[MD5_HASH_SIZE];   ///< MD5 hash of the decrypted icon.bin area.
-    u32 unknown_lower_tid;              ///< Lower ID from another title (unknown purpose).
+    u8 icon_bin_hash[MD5_HASH_SIZE];    ///< MD5 hash of the decrypted icon.bin.
+    u32 unknown_low_tid;                ///< Lower ID from another title (unknown purpose).
     u64 ref_title_id_1;                 ///< Full ID from another title (unknown purpose).
     u64 ref_title_id_2;                 ///< Full ID from another title (unknown purpose).
     CntBinImetHeader imet_header;       ///< IMET header.

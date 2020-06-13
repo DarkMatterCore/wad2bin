@@ -86,11 +86,7 @@ int main(int argc, char **argv)
     
     /* Start conversion procedure. */
     res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4]);
-    if (!res)
-    {
-        ret = -4;
-        goto out;
-    }
+    if (!res) ret = -4;
     
 out:
     for(u32 i = 0; i <= ARG_COUNT; i++)
@@ -100,3 +96,5 @@ out:
     
     return ret;
 }
+
+
