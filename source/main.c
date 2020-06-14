@@ -74,7 +74,7 @@ int main(int argc, char **argv)
             }
 #else
             /* Copy path. */
-            os_snprintf(paths[i], MAX_PATH, argv[i + 1]);
+            os_snprintf(paths[i], MAX_PATH, "%s", argv[i + 1]);
 #endif
             
             /* Check if the output directory string ends with a path separator. */

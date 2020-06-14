@@ -29,7 +29,14 @@
 
 #define VERSION                         "0.1"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#endif
 #define ERROR_MSG(fmt, ...)             utilsPrintErrorMessage(__func__, fmt, ##__VA_ARGS__)
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #define MEMBER_SIZE(type, member)       sizeof(((type*)NULL)->member)
 

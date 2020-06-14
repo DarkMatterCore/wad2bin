@@ -35,6 +35,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 #ifndef MAX_PATH
 #define MAX_PATH    1024
@@ -94,8 +95,8 @@ typedef struct stat os_stat_t;
 #define OS_PRINT_PRECISION_STR          "%.*s"
 
 #define os_fopen                        fopen
-#define os_fseek                        fseek       /// Large file support already enabled.
-#define os_ftell                        ftell       /// Large file support already enabled.
+#define os_fseek                        fseeko
+#define os_ftell                        ftello
 #define os_strlen                       strlen
 #define os_strcmp                       strcmp
 #define os_strncmp                      strncmp

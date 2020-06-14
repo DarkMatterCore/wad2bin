@@ -154,7 +154,7 @@ void utilsPrintHexData(const char *msg, const void *data, size_t size)
 {
     if (!data || !size) return;
     
-    if (msg && strlen(msg)) printf(msg);
+    if (msg && strlen(msg)) printf("%s", msg);
     
     const u8 *data_u8 = (const u8*)data;
     
@@ -167,7 +167,7 @@ void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, size_t size)
 {
     if (!utf16be_str || !size) return;
     
-    if (msg && strlen(msg)) printf(msg);
+    if (msg && strlen(msg)) printf("%s", msg);
     
     for(size_t i = 0; i < size && utf16be_str[i] != 0; i++) printf("%lc", bswap_16(utf16be_str[i]));
     

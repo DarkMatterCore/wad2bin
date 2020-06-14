@@ -370,9 +370,9 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
         /* Print content information. */
         printf("  Content #%u:\n", content_index + 1);
         printf("    Offset:               0x%" PRIx64 ".\n", os_ftell(content_bin));
-        printf("    Size (unpacked):      0x%" PRIx64 ".\n", content_size);
-        printf("    Size (encrypted):     0x%" PRIx64 ".\n", ALIGN_UP(content_size, AES_BLOCK_SIZE));
-        printf("    Size (padded):        0x%" PRIx64 ".\n\n", ALIGN_UP(content_size, WAD_BLOCK_SIZE));
+        printf("    Size (unpacked):      0x%zx.\n", content_size);
+        printf("    Size (encrypted):     0x%zx.\n", ALIGN_UP(content_size, AES_BLOCK_SIZE));
+        printf("    Size (padded):        0x%zx.\n\n", ALIGN_UP(content_size, WAD_BLOCK_SIZE));
         
         /* Write encrypted content file. */
         if (!cntbinWriteContent(content_bin, prng_key, content_iv, &sha1_ctx, tmp_path, content_size))

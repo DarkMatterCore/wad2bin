@@ -1,2 +1,5 @@
+# Set this to the C compiler name/alias you wish to use.
 CC		:=	gcc
-EXEEXT	:=	.exe
+
+# Leave EXEEXT empty if not compiling for Windows.
+EXEEXT	:=	.exe 
