@@ -105,7 +105,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", wad_path);
     
     /* Retrieve ticket common block, TMD common block and TMD contents. */
-    tik_common_block = tikGetCommonBlockFromBuffer(ticket, ticket_size, NULL);
+    //tik_common_block = tikGetCommonBlockFromBuffer(ticket, ticket_size, NULL);
     tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
     tmd_contents = TMD_CONTENTS(tmd_common_block);
     content_count = bswap_16(tmd_common_block->content_count);
