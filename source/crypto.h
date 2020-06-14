@@ -28,12 +28,21 @@
 #include <mbedtls/sha1.h>
 #include <mbedtls/md5.h>
 
+#ifndef SHA1_HASH_SIZE
 #define SHA1_HASH_SIZE      20
+#endif
 
+#ifndef MD5_HASH_SIZE
 #define MD5_HASH_SIZE       16
+#endif
 
+#ifndef AES_BLOCK_SIZE
 #define AES_BLOCK_SIZE      16
+#endif
+
+#ifndef AES_BLOCK_SIZE_BITS
 #define AES_BLOCK_SIZE_BITS (AES_BLOCK_SIZE * 8)
+#endif
 
 #define ECC_PRIV_KEY_SIZE   32
 #define ECC_PUB_KEY_SIZE    64
@@ -56,7 +65,10 @@ bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void
 
 /// Generates an ECSDA signature using the provided ECC private key.
 /// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.
-void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig);
+void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig);
+
+/// Same as cryptoGenerateEcsdaSignatureWithData, but takes an input SHA-1 hash instead of calculating it on its own over a provided memory block.
+void cryptoGenerateEcsdaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig);
 
 /// Generates an ECC public key using the provided ECC private key.
 /// Takes care of handling key padding when needed. The generated key can be used in AP certificates.

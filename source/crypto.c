@@ -119,7 +119,7 @@ out:
     return success;
 }
 
-void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig)
+void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig)
 {
     if (!private_key || !dst || !src || !size) return;
     
@@ -141,6 +141,49 @@ void cryptoGenerateEcsdaSignature(const void *private_key, void *dst, const void
     /* Calculate SHA-1 hash over source data. */
     mpz_init(hash);
     sha1((const u8*)src, size, NOT_IQUE_HASH, hash);
+    
+    /* Generate ECSDA signature. */
+    ecdsa_sign(hash, priv_key, r, s);
+    mpz_clear(hash);
+    
+    /* Convert ECSDA signature to a byte stream. */
+    elem_to_os(r, full_sig);
+    elem_to_os(s, full_sig + 32);
+    
+    if (padded_sig)
+    {
+        /* Copy ECSDA signature as-is. */
+        memcpy(dst_u8, full_sig, ECSDA_SIG_SIZE);
+    } else {
+        /* Generate unpadded ECSDA signature. */
+        /* Wii ECSDA signatures are normally 60 bytes long. */
+        memcpy(dst_u8, full_sig + 2, 30);
+        memcpy(dst_u8 + 30, full_sig + 34, 30);
+    }
+}
+
+void cryptoGenerateEcsdaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig)
+{
+    if (!private_key || !dst || !data_hash) return;
+    
+    element priv_key = {0}, r = {0}, s = {0};
+    u8 padded_priv_key[ECC_PRIV_KEY_SIZE] = {0};
+    
+    u8 full_sig[ECSDA_SIG_SIZE] = {0};
+    
+    mpz_t hash = {0};
+    u8 *dst_u8 = (u8*)dst;
+    
+    /* Generate padded ECC private key. */
+    /* Wii ECC private keys are 30 bytes long. */
+    memcpy(padded_priv_key + 2, private_key, ECC_PRIV_KEY_SIZE - 2);
+    
+    /* Convert private key to a GF(2^m) element. */
+    os_to_elem(padded_priv_key, priv_key);
+    
+    /* Convert SHA-1 hash to a multi-precision integer. */
+    mpz_init(hash);
+    mpz_import(hash, SHA1_HASH_SIZE, 1, sizeof(u8), 0, 0, data_hash);
     
     /* Generate ECSDA signature. */
     ecdsa_sign(hash, priv_key, r, s);

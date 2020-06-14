@@ -271,32 +271,74 @@ void utilsCreateDirectoryTree(const os_char_t *path)
     os_mkdir(path, 0777);
 }
 
-size_t utilsWritePadding(FILE *fd, size_t size, size_t alignment)
+bool utilsWritePadding(FILE *fd, size_t *size, size_t alignment)
 {
-    if (!fd || !size || !alignment)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return 0;
-    }
-    
     u8 *pad = NULL;
     size_t res = 0, pad_size = 0, new_size = 0;
+    bool success = false;
     
-    if (IS_ALIGNED(size, alignment)) return size;
+    if (!fd || !size || !(new_size = *size) || !alignment)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
     
-    pad_size = (ALIGN_UP(size, alignment) - size);
+    if (IS_ALIGNED(new_size, alignment)) return true;
+    
+    pad_size = (ALIGN_UP(new_size, alignment) - new_size);
+    new_size += pad_size;
     
     pad = calloc(pad_size, sizeof(u8));
     if (!pad)
     {
         ERROR_MSG("Error allocating memory for pad block!");
-        return 0;
+        return false;
     }
     
     res = fwrite(pad, 1, pad_size, fd);
-    new_size = (res == pad_size ? (size + pad_size) : 0);
+    if (res != pad_size)
+    {
+        ERROR_MSG("Failed to write pad block!");
+        goto out;
+    }
     
+    *size = new_size;
+    success = true;
+    
+out:
     free(pad);
     
-    return new_size;
+    return success;
+}
+
+bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment)
+{
+    u8 *tmp_buf = NULL;
+    size_t pad_size = 0, new_size = 0;
+    
+    if (!buf || !*buf || !size || !(new_size = *size) || !alignment)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    if (IS_ALIGNED(new_size, alignment)) return true;
+    
+    pad_size = (ALIGN_UP(new_size, alignment) - new_size);
+    
+    tmp_buf = realloc(*buf, new_size + pad_size);
+    if (!tmp_buf)
+    {
+        ERROR_MSG("Failed to reallocate buffer!");
+        return false;
+    }
+    
+    memset(tmp_buf + new_size, 0, pad_size);
+    new_size += pad_size;
+    
+    *buf = tmp_buf;
+    *size = new_size;
+    tmp_buf = NULL;
+    
+    return true;
 }

@@ -24,7 +24,9 @@
 #ifndef __WAD_H__
 #define __WAD_H__
 
-#define WAD_BLOCK_ALIGNMENT     0x40
+#include "tmd.h"
+
+#define WAD_BLOCK_SIZE          0x40
 #define WAD_HEADER_SIZE_STR(x)  ((x) == WadHeaderSize_InstallablePackage ? "InstallablePackage" : ((x) == WadHeaderSize_BackupPackage ? "BackupPackage" : "Unknown"))
 #define WAD_TYPE_STR(x)         ((x) == WadType_NormalPackage ? "Normal" : ((x) == WadType_Boot2Package ? "Boot2" : ((x) == WadType_BackupPackage ? "Backup" : "Unknown")))
 #define WAD_VERSION_STR(x)      ((x) == WadVersion_InstallablePackage ? "InstallablePackage" : ((x) == WadVersion_BackupPackage ? "BackupPackage" : "Unknown"))
@@ -56,6 +58,7 @@ typedef struct {
     u32 tmd_size;           ///< TMD size.
     u32 data_size;          ///< Encrypted content data size.
     u32 footer_size;        ///< Decrypted footer size.
+    u8 padding[0x20];
 } WadInstallablePackageHeader;
 
 /// Used with both data.bin and content.bin files.
@@ -63,7 +66,7 @@ typedef struct {
     u32 header_size;            ///< WadHeaderSize_BackupPackage.
     u16 type;                   ///< WadType_BackupPackage.
     u16 version;                ///< WadVersion_BackupPackage.
-    u32 ng_id;                  ///< Console ID.
+    u32 console_id;             ///< Console ID.
     u32 save_file_count;        ///< Savegame file count. Only used with data.bin - set to zero otherwise.
     u32 save_file_data_size;    ///< Savegame file data size. Only used with data.bin - set to zero otherwise.
     u32 content_tmd_size;       ///< TMD size. Only used with content.bin - set to zero otherwise.
@@ -73,6 +76,7 @@ typedef struct {
     u64 title_id;               ///< Title ID. Only used with data.bin - set to zero otherwise.
     u8 mac_address[0x06];       ///< Console MAC address. Only used with data.bin - set to zero otherwise.
     u8 reserved[0x02];
+    u8 padding[0x10];
 } WadBackupPackageHeader;
 
 /// Unpacks an installable WAD package to a destination directory.
@@ -92,6 +96,31 @@ ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePacka
     wad_header->tmd_size = __builtin_bswap32(wad_header->tmd_size);
     wad_header->data_size = __builtin_bswap32(wad_header->data_size);
     wad_header->footer_size = __builtin_bswap32(wad_header->footer_size);
+}
+
+/// Byteswaps fields from a backup WAD package.
+ALWAYS_INLINE void wadByteswapBackupPackageHeaderFields(WadBackupPackageHeader *wad_header)
+{
+    if (!wad_header || IS_BIG_ENDIAN) return;
+    wad_header->header_size = __builtin_bswap32(wad_header->header_size);
+    wad_header->type = __builtin_bswap16(wad_header->type);
+    wad_header->version = __builtin_bswap16(wad_header->version);
+    wad_header->console_id = __builtin_bswap32(wad_header->console_id);
+    wad_header->save_file_count = __builtin_bswap32(wad_header->save_file_count);
+    wad_header->save_file_data_size = __builtin_bswap32(wad_header->save_file_data_size);
+    wad_header->content_tmd_size = __builtin_bswap32(wad_header->content_tmd_size);
+    wad_header->content_data_size = __builtin_bswap32(wad_header->content_data_size);
+    wad_header->backup_area_size = __builtin_bswap32(wad_header->backup_area_size);
+    wad_header->title_id = __builtin_bswap64(wad_header->title_id);
+}
+
+/// Update included contents field from a backup WAD package based on the content index.
+ALWAYS_INLINE void wadUpdateBackupPackageHeaderIncludedContents(WadBackupPackageHeader *wad_header, u16 content_index)
+{
+    if (!wad_header || content_index >= TMD_MAX_CONTENT_COUNT) return;
+    u8 byte_index = (u8)(content_index / 8);
+    u8 bit_index = (u8)BIT(content_index - ALIGN_DOWN(content_index, 8));
+    wad_header->included_contents[byte_index] |= bit_index;
 }
 
 #endif /* __WAD_H__ */

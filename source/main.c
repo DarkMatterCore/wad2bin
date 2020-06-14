@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     {
         printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
-        printf("The required directory tree containing the content.bin file will be created at the output directory.\n");
+        printf("The required directory tree for the content.bin file will be created at the output directory.\n");
         printf("You can set your SD card root directory as the output directory.\n");
         ret = -1;
         goto out;

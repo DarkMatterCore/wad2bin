@@ -26,6 +26,7 @@
 
 #include "wad.h"
 #include "crypto.h"
+#include "cert.h"
 
 #define IMET_MAGIC              (u32)0x494D4554         /* "IMET". */
 #define IMET_HASHED_AREA_SIZE   (u32)0x600
@@ -60,18 +61,25 @@ typedef struct {
 /// Then, a WAD backup package header (WadBackupPackageHeader) follows, also known as "Bk" header or Part C.
 /// A cleartext TMD area follows, also known as Part D.
 /// Part E is nothing more than the encrypted content files, using console specific keydata.
-/// Finally, Part F is cleartext certificate area used to verify the package validity, using an ECC signature that's calculated from Part C onwards.
+/// Finally, Part F is cleartext certificate area used to verify the package validity, using an ECC signature that's calculated from Part C onwards (check CntBinCertArea).
 /// Each part from a content.bin file must be aligned to a 64-byte boundary, using zeroes to pad data if necessary (except for the end of Part D and the start of Part E).
 typedef struct {
     u64 title_id;                       ///< Title ID.
     u32 icon_bin_size;                  ///< Decrypted icon.bin size. Align to AES_BLOCK_SIZE to get the Part B size.
-    u8 header_hash[MD5_HASH_SIZE];      ///< MD5 hash of the header with this field set to zeroes.
-    u8 icon_bin_hash[MD5_HASH_SIZE];    ///< MD5 hash of the decrypted icon.bin.
+    u8 header_hash[MD5_HASH_SIZE];      ///< MD5 hash of the header with this field set to the MD5 blanker.
+    u8 icon_bin_hash[MD5_HASH_SIZE];    ///< MD5 hash of the decrypted icon.bin (with WAD block alignment padding).
     u32 unknown_low_tid;                ///< Lower ID from another title (unknown purpose).
     u64 ref_title_id_1;                 ///< Full ID from another title (unknown purpose).
     u64 ref_title_id_2;                 ///< Full ID from another title (unknown purpose).
     CntBinImetHeader imet_header;       ///< IMET header.
 } CntBinHeader;
+
+/// Plaintext certificate area, also known as Part F.
+typedef struct {
+    u8 signature[ECSDA_SIG_SIZE];
+    CertSigEcc480PubKeyEcc480 device_cert;
+    CertSigEcc480PubKeyEcc480 ap_cert;
+} CntBinCertArea;
 
 bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, os_char_t *out_path, os_char_t *tmp_path);
 

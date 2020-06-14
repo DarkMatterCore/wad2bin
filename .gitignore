@@ -5,6 +5,7 @@
 /wad2cntbin.exe
 /wad2cntbin_wad_data
 /private
+/content.bin
 *.wad
 *.o
 *.so

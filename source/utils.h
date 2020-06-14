@@ -48,7 +48,11 @@
 #define TITLE_TYPE_DISC_BASED_CHANNEL   (u32)0x00010004
 #define TITLE_TYPE_DLC                  (u32)0x00010005
 
+#define SYSTEM_MENU_TID                 TITLE_ID(1, 2)
+
 #define SD_CONTENT_PATH_LENGTH          35
+
+#define CONTENT_BLOCKSIZE               0x800000    /* 8 MiB. */
 
 void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
@@ -66,6 +70,8 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
 void utilsCreateDirectoryTree(const os_char_t *path);
 
-size_t utilsWritePadding(FILE *fd, size_t size, size_t alignment);
+bool utilsWritePadding(FILE *fd, size_t *size, size_t alignment);
+
+bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment);
 
 #endif /* __UTILS_H__ */
