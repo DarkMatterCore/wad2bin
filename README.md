@@ -15,11 +15,12 @@ Usage:
 --------------
 
 ```
-wad2bin <keys file> <device.cert> <input WAD> <output dir>
+%s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]
 
 Paths must not exceed 1023 characters. Relative paths are supported.
 The required directory tree for the *.bin file(s) will be created at the output directory.
 You can set your SD card root directory as the output directory.
+Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
 ```
 
 Differences between `content.bin` files and `<index>.bin` files:
@@ -50,6 +51,10 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 
 Changelog:
 --------------
+
+**v0.3:**
+
+Force the user to provide the full parent title ID for DLC WADs.
 
 **v0.2:**
 

@@ -423,7 +423,7 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size, u64 parent_tid)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
@@ -447,9 +447,6 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     u64 title_id = 0;
     char tid_lower_ascii[5] = {0};
     
-    u64 parent_tid = 0;
-    u32 parent_tid_lower = 0;
-    
     WadBackupPackageHeader bk_header = {0};
     size_t res = 0;
     
@@ -467,10 +464,6 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     /* Convert the Title ID lower u32 to ASCII. */
     title_id = bswap_64(tmd_common_block->title_id);
     utilsGenerateAsciiStringFromTitleIdLower(title_id, tid_lower_ascii);
-    
-    /* Generate parent Title ID. */
-    parent_tid_lower = ((TITLE_LOWER(title_id) & 0xFFFFFF) | ((u32)(tid_lower_ascii[0] - 0x20) << 24));
-    parent_tid = TITLE_ID((tid_lower_ascii[0] == 'r' || tid_lower_ascii[0] == 's') ? TITLE_TYPE_DISC_GAME : TITLE_TYPE_DOWNLOADABLE_CHANNEL, parent_tid_lower);
     
     /* Create directory tree. */
     os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, PRIVATE_PATH("data"), tid_lower_ascii);
@@ -535,7 +528,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         printf("  TMD size:               0x%" PRIx32 ".\n", bk_header.content_tmd_size);
         printf("  Content data size:      0x%" PRIx32 ".\n", bk_header.content_data_size);
         printf("  Backup area size:       0x%" PRIx32 ".\n", bk_header.backup_area_size);
-        printf("  Title ID:               0x%" PRIx64 ".\n\n", bk_header.title_id);
+        printf("  Title ID:               %016" PRIx64 ".\n\n", bk_header.title_id);
         
         /* Byteswap backup WAD header fields. */
         wadByteswapBackupPackageHeaderFields(&bk_header);

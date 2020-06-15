@@ -31,6 +31,7 @@ int main(int argc, char **argv)
     
     /* Reserve memory for an extra temporary path. */
     os_char_t *paths[ARG_COUNT + 1] = {0};
+    u64 parent_tid = 0;
     
     u8 *cert_chain = NULL;
     size_t cert_chain_size = 0;
@@ -48,12 +49,14 @@ int main(int argc, char **argv)
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
-    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH)
+    if (argc < (ARG_COUNT + 1) || argc > (ARG_COUNT + 2) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || \
+        (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH || (argc == (ARG_COUNT + 2) && strlen(argv[5]) != 16))
     {
-        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
+        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
         printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
         printf("You can set your SD card root directory as the output directory.\n");
+        printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n");
         ret = -1;
         goto out;
     }
@@ -97,10 +100,34 @@ int main(int argc, char **argv)
         }
     }
     
+    /* Check if the user provided a parent title ID. */
+    if (argc == (ARG_COUNT + 2))
+    {
+        /* Parse parent title ID. */
+        if (!keysParseHexKey((u8*)&parent_tid, NULL, argv[5], 8, false))
+        {
+            printf("Failed to parse parent title ID!\n");
+            ret = -4;
+            goto out;
+        }
+        
+        /* Byteswap parent title ID. */
+        parent_tid = bswap_64(parent_tid);
+        
+        /* Check if the TID upper u32 is valid. */
+        u32 parent_tid_upper = TITLE_UPPER(parent_tid);
+        if (parent_tid_upper != TITLE_TYPE_DISC_GAME && parent_tid_upper != TITLE_TYPE_DOWNLOADABLE_CHANNEL && parent_tid_upper != TITLE_TYPE_DISC_BASED_CHANNEL)
+        {
+            printf("Invalid parent title ID category!\nOnly disc-based game IDs, downloadable channel IDs and disc-based channel IDs are supported.\n");
+            ret = -5;
+            goto out;
+        }
+    }
+    
     /* Load keydata and device certificate. */
     if (!keysLoadKeyDataAndDeviceCert(paths[0], paths[1]))
     {
-        ret = -4;
+        ret = -6;
         goto out;
     }
     
@@ -109,7 +136,7 @@ int main(int argc, char **argv)
     /* Unpack input WAD package. */
     if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, dec_titlekey, &tid_upper))
     {
-        ret = -5;
+        ret = -7;
         goto out;
     }
     
@@ -121,23 +148,31 @@ int main(int argc, char **argv)
     if (!utilsAlignBuffer((void**)&tmd, &aligned_tmd_size, WAD_BLOCK_SIZE))
     {
         printf("Failed to align TMD buffer to WAD block size!\n");
-        ret = -6;
+        ret = -8;
         goto out;
     }
     
     if (tid_upper == TITLE_TYPE_DLC)
     {
-        /* Generate <index>.bin file(s). */
-        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
+        /* Check if a parent title ID was provided. */
+        if (argc != (ARG_COUNT + 2))
         {
-            ret = -7;
+            printf("Error: parent title ID not provided! This is required for DLC titles.\n");
+            ret = -9;
+            goto out;
+        }
+        
+        /* Generate <index>.bin file(s). */
+        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size, parent_tid))
+        {
+            ret = -10;
             goto out;
         }
     } else {
         /* Generate content.bin file. */
         if (!binGenerateContentBinFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
         {
-            ret = -8;
+            ret = -11;
             goto out;
         }
     }
@@ -158,7 +193,7 @@ out:
     if (cert_chain) free(cert_chain);
     
     /* Remove unpacked WAD directory. */
-    utilsRemoveDirectoryRecursively(paths[4]);
+    if (paths[4]) utilsRemoveDirectoryRecursively(paths[4]);
     
     for(u32 i = 0; i <= ARG_COUNT; i++)
     {
