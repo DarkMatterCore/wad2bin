@@ -1,5 +1,5 @@
 /*
- * cntbin.h
+ * bin.h
  *
  * Copyright (c) 2020, DarkMatterCore <pabloacurielz@gmail.com>.
  *
@@ -21,8 +21,8 @@
 
 #pragma once
 
-#ifndef __CNTBIN_H__
-#define __CNTBIN_H__
+#ifndef __BIN_H__
+#define __BIN_H__
 
 #include "wad.h"
 #include "crypto.h"
@@ -48,7 +48,7 @@ typedef struct {
     u16 names[10][IMET_NAME_LENGTH];    ///< Title names in different languages (Japanese, English, German, French, Spanish, Italian, Dutch, unknown, unknown, Korean). Encoded using UTF-16BE.
     u8 padding_2[0x24C];
     u8 hash[MD5_HASH_SIZE];             ///< MD5 hash from the magic word to hash_size. This field must be set to zeroes when calculating the hash.
-} CntBinImetHeader;
+} BinContentImetHeader;
 
 /// Used in the encrypted icon.bin copy in content.bin (Part B).
 typedef struct {
@@ -56,14 +56,14 @@ typedef struct {
     u32 data_size;          ///< Data size after this header.
     u8 reserved[0x08];
     u8 hash[MD5_HASH_SIZE]; ///< MD5 hash calculated over IMD5 data after this header.
-} CntBinImd5Header;
+} BinContentImd5Header;
 
 /// content.bin encrypted header (Part A).
 /// This is followed by an encrypted copy of the icon.bin portion from the title's opening.bnr, which is known as Part B and has a variable size.
 /// Then, a WAD backup package header (WadBackupPackageHeader) follows, also known as "Bk" header or Part C.
 /// A cleartext TMD area follows, also known as Part D.
 /// Part E is nothing more than the encrypted content files, using console specific keydata.
-/// Finally, Part F is a plaintext certificate area used to verify the backup package validity, using an ECC signature that's calculated from Part C onwards (check CntBinCertArea).
+/// Finally, Part F is a plaintext certificate area used to verify the backup package validity, using an ECC signature that's calculated from Part C onwards (check BinContentCertArea).
 /// Each part from a content.bin file must be aligned to a 64-byte boundary, using zeroes to pad data if necessary.
 typedef struct {
     u64 title_id;                       ///< Title ID.
@@ -73,17 +73,20 @@ typedef struct {
     u32 unknown_tid_lower;              ///< Title ID lower u32 from another title (unknown purpose).
     u64 ref_tid_1;                      ///< Full Title ID from another title (unknown purpose).
     u64 ref_tid_2;                      ///< Full Title ID from another title (unknown purpose).
-    CntBinImetHeader imet_header;       ///< IMET header.
-} CntBinHeader;
+    BinContentImetHeader imet_header;   ///< IMET header.
+} BinContentHeader;
 
 /// Plaintext certificate area (Part F).
 typedef struct {
     u8 signature[ECSDA_SIG_SIZE];
     CertSigEcc480PubKeyEcc480 device_cert;
     CertSigEcc480PubKeyEcc480 ap_cert;
-} CntBinCertArea;
+} BinContentCertArea;
 
 /// Generates a content.bin file using an unpacked WAD data directory and TMD data loaded into memory.
-bool cntbinGenerateFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 **tmd, size_t *tmd_size);
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size);
 
-#endif /* __CNTBIN_H__ */
+/// Generates <index>.bin file(s) using an unpacked WAD data directory and TMD data loaded into memory.
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size);
+
+#endif /* __BIN_H__ */

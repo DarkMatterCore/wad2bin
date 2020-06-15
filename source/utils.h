@@ -52,6 +52,7 @@
 #define TITLE_ID(x, y)                  (((u64)(x) << 32) | (y))
 
 #define TITLE_TYPE_SYSTEM               (u32)0x00000001
+#define TITLE_TYPE_DISC_GAME            (u32)0x00010000
 #define TITLE_TYPE_DOWNLOADABLE_CHANNEL (u32)0x00010001
 #define TITLE_TYPE_DISC_BASED_CHANNEL   (u32)0x00010004
 #define TITLE_TYPE_DLC                  (u32)0x00010005

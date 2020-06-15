@@ -21,7 +21,7 @@
 
 #include "utils.h"
 #include "keys.h"
-#include "cntbin.h"
+#include "bin.h"
 
 #define ARG_COUNT   4
 
@@ -115,20 +115,29 @@ int main(int argc, char **argv)
     
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
     
+    /* Reallocate TMD buffer (if necessary). */
+    /* We need to do this if the TMD size isn't aligned to the WAD block size. */
     aligned_tmd_size = tmd_size;
+    if (!utilsAlignBuffer((void**)&tmd, &aligned_tmd_size, WAD_BLOCK_SIZE))
+    {
+        printf("Failed to align TMD buffer to WAD block size!\n");
+        ret = -6;
+        goto out;
+    }
     
     if (tid_upper == TITLE_TYPE_DLC)
     {
-        
-        
-        
-        
-        
-    } else {
-        /* Generate content.bin file. */
-        if (!cntbinGenerateFromUnpackedInstallableWadPackage(paths[4], paths[3], &tmd, &aligned_tmd_size))
+        /* Generate <index>.bin file(s). */
+        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
         {
             ret = -7;
+            goto out;
+        }
+    } else {
+        /* Generate content.bin file. */
+        if (!binGenerateContentBinFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
+        {
+            ret = -8;
             goto out;
         }
     }

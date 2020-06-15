@@ -2,7 +2,7 @@
 
 Converts installable Wii WAD packages to backup WAD packages (*.bin files) using console-specific keydata. These files can be stored on a SD card and used to launch channels via System Menu 4.0+, or used with games that save/read data in this format.
 
-Guidelines
+Guidelines:
 --------------
 
 * Console-specific data is required to perform the conversion. Dump it from the target console using [xyzzy-mod](https://github.com/DarkMatterCore/xyzzy-mod).
@@ -11,7 +11,7 @@ Guidelines
     * A homebrew-based solution to install both ticket and TMD after the WAD package has been converted is being looked into.
 * If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
 
-Usage
+Usage:
 --------------
 
 ```
@@ -47,3 +47,14 @@ License:
 --------------
 
 wad2bin is licensed under GPLv3 or (at your option) any later version.
+
+Changelog:
+--------------
+
+**v0.2:**
+
+Added proper support for DLC WADs, even if they're incomplete (e.g. full TMD with missing content files).
+
+**v0.1:**
+
+Initial release.
