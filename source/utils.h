@@ -58,9 +58,11 @@
 
 #define SYSTEM_MENU_TID                 TITLE_ID(1, 2)
 
-#define SD_CONTENT_PATH_LENGTH          35
+#define SD_CONTENT_PATH_MAX_LENGTH      35
 
-#define CONTENT_BLOCKSIZE               0x800000    /* 8 MiB. */
+/* "dir" is a subdirectory name inside "/private/wii/". */
+/* "%s" is replaced by the desired filename using *printf functions. */
+#define PRIVATE_PATH(dir)               OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR dir OS_PATH_SEPARATOR "%s"
 
 void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
@@ -81,5 +83,7 @@ void utilsCreateDirectoryTree(const os_char_t *path);
 bool utilsWritePadding(FILE *fd, size_t *size, size_t alignment);
 
 bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment);
+
+void utilsGenerateAsciiStringFromTitleIdLower(u64 title_id, char *out);
 
 #endif /* __UTILS_H__ */

@@ -24,11 +24,16 @@
 #include "tik.h"
 #include "wad.h"
 
-static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 titlekey[AES_BLOCK_SIZE], const u8 iv[AES_BLOCK_SIZE], const TmdContentRecord *content_record, const os_char_t *out_path);
+#define WAD_CONTENT_BLOCKSIZE   0x800000    /* 8 MiB. */
 
-bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out_dir, u8 **out_cert_chain, size_t *out_cert_chain_size, u8 **out_tik, size_t *out_tik_size, u8 **out_tmd, size_t *out_tmd_size)
+static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, size_t cnt_size, const u8 *cnt_hash, const os_char_t *out_path, size_t *out_aligned_cnt_size);
+
+bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, size_t *out_cert_chain_size, u8 **out_tik, size_t *out_tik_size, u8 **out_tmd, \
+                                 size_t *out_tmd_size, u8 *out_dec_titlekey, u32 *out_tid_upper)
 {
-    if (!wad_path || !os_strlen(wad_path) || !out_dir || !os_strlen(out_dir) || (!out_cert_chain && out_cert_chain_size) || (out_cert_chain && !out_cert_chain_size) || \
+    size_t out_path_len = 0;
+    
+    if (!wad_path || !os_strlen(wad_path) || !out_path || !(out_path_len = os_strlen(out_path)) || (!out_cert_chain && out_cert_chain_size) || (out_cert_chain && !out_cert_chain_size) || \
         (!out_tik && out_tik_size) || (out_tik && !out_tik_size) || (!out_tmd && out_tmd_size) || (out_tmd && !out_tmd_size))
     {
         ERROR_MSG("Invalid parameters!");
@@ -40,7 +45,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     bool save_tmd = (out_tmd && out_tmd_size);
     
     FILE *wad_fd = NULL;
-    size_t wad_offset = 0, wad_size = 0, res = 0;
+    size_t wad_offset = 0, wad_size = 0, calc_wad_size = 0, res = 0;
     
     WadInstallablePackageHeader wad_header = {0};
     
@@ -52,18 +57,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     u8 *ticket = NULL;
     TikCommonBlock *tik_common_block = NULL;
     TmdContentRecord *tmd_contents = NULL;
+    u64 tik_tid = 0;
     
     u8 *tmd = NULL;
     TmdCommonBlock *tmd_common_block = NULL;
-    
-    u64 tik_tid = 0, tmd_tid = 0;
     u16 content_count = 0;
+    u64 tmd_tid = 0;
     
-    os_char_t entry_path[MAX_PATH] = {0};
-    
+    u32 tid_upper = 0;
     u8 titlekey_iv[AES_BLOCK_SIZE] = {0};
     u8 dec_titlekey[AES_BLOCK_SIZE] = {0};
-    u8 content_iv[AES_BLOCK_SIZE] = {0};
+    u8 cnt_iv[AES_BLOCK_SIZE] = {0};
     
     bool success = false;
     
@@ -110,16 +114,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     
     /* Check header fields. */
     /* Discard WadType_Boot2Package while we're at it. */
+    calc_wad_size = (sizeof(WadInstallablePackageHeader) + ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_SIZE) + \
+                     ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.data_size, WAD_BLOCK_SIZE));
+    
     if (wad_header.header_size != WadHeaderSize_InstallablePackage || wad_header.type != WadType_NormalPackage || wad_header.version != WadVersion_InstallablePackage || \
-        !wad_header.cert_chain_size || wad_header.ticket_size < TIK_MIN_SIZE || wad_header.tmd_size < TMD_MIN_SIZE || !wad_header.data_size || \
-        wad_size < (ALIGN_UP(wad_header.header_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.cert_chain_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_SIZE) + \
-        ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.data_size, WAD_BLOCK_SIZE)))
+        !wad_header.cert_chain_size || wad_header.ticket_size < TIK_MIN_SIZE || wad_header.tmd_size < TMD_MIN_SIZE || !wad_header.data_size || wad_size < calc_wad_size)
     {
         ERROR_MSG("Invalid WAD header in \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
     }
     
-    /* Update offset. */
+    /* Update WAD offset. */
     wad_offset += sizeof(WadInstallablePackageHeader);
     
     /* Read certificate chain. */
@@ -131,8 +136,8 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     }
     
     /* Save certificate chain. */
-    os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "cert.bin", out_dir);
-    if (!utilsWriteDataToFile(entry_path, cert_chain, wad_header.cert_chain_size))
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "cert.bin");
+    if (!utilsWriteDataToFile(out_path, cert_chain, wad_header.cert_chain_size))
     {
         ERROR_MSG("Failed to save certificate chain from \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
@@ -191,8 +196,8 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     }
     
     /* Save ticket. */
-    os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "tik.bin", out_dir);
-    if (!utilsWriteDataToFile(entry_path, ticket, wad_header.ticket_size))
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "tik.bin");
+    if (!utilsWriteDataToFile(out_path, ticket, wad_header.ticket_size))
     {
         ERROR_MSG("Failed to save ticket from \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
@@ -238,13 +243,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     tmd_tid = bswap_64(tmd_common_block->title_id);
     if (tik_tid != tmd_tid)
     {
-        ERROR_MSG("Ticket/TMD Title ID mismatch! (%08" PRIx32 "-%08" PRIx32 " != %08" PRIx32 "-%08" PRIx32 ").", TITLE_UPPER(tik_tid), TITLE_LOWER(tik_tid), TITLE_UPPER(tmd_tid), TITLE_LOWER(tmd_tid));
+        ERROR_MSG("Ticket/TMD Title ID mismatch! (%08" PRIx32 "-%08" PRIx32 " [Ticket] != %08" PRIx32 "-%08" PRIx32 " [TMD]).", TITLE_UPPER(tik_tid), TITLE_LOWER(tik_tid), TITLE_UPPER(tmd_tid), \
+                  TITLE_LOWER(tmd_tid));
         goto out;
     }
     
+    /* Retrieve TID upper u32. */
+    tid_upper = TITLE_UPPER(tik_tid);
+    
     /* Save TMD. */
-    os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "tmd.bin", out_dir);
-    if (!utilsWriteDataToFile(entry_path, tmd, wad_header.tmd_size))
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "tmd.bin");
+    if (!utilsWriteDataToFile(out_path, tmd, wad_header.tmd_size))
     {
         ERROR_MSG("Failed to save TMD from \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
@@ -258,25 +267,16 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
     content_count = bswap_16(tmd_common_block->content_count);
     tmd_contents = TMD_CONTENTS(tmd_common_block);
     
-    for(u16 i = 0; i < content_count; i++)
+    for(u16 i = 0; i < content_count && wad_offset < calc_wad_size; i++)
     {
         /* Generate content IV. */
-        memset(content_iv, 0, AES_BLOCK_SIZE);
-        memcpy(content_iv, &(tmd_contents[i].index), sizeof(u16));
+        memset(cnt_iv, 0, AES_BLOCK_SIZE);
+        memcpy(cnt_iv, &(tmd_contents[i].index), sizeof(u16));
         
-        /* Byteswap content record fields. */
+        /* Temporarily byteswap content record fields. */
         tmdByteswapTitleMetadataContentRecordFields(&(tmd_contents[i]));
         
-        /* Print content info. */
-        printf("  TMD content #%u:\n", i + 1);
-        printf("    Content ID:           %08" PRIx32 ".\n", tmd_contents[i].content_id);
-        printf("    Content index:        %04" PRIx16 ".\n", tmd_contents[i].index);
-        printf("    Content type:         %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
-        printf("    Content size:         0x%" PRIx64 ".\n", tmd_contents[i].size);
-        utilsPrintHexData("    Content SHA-1 hash:   ", tmd_contents[i].hash, SHA1_HASH_SIZE);
-        utilsPrintHexData("    Content IV:           ", content_iv, AES_BLOCK_SIZE);
-        printf("\n");
-        
+        /* Check if we're dealing with an unknown content type. */
         if (tmd_contents[i].type != TmdContentRecordType_Normal && tmd_contents[i].type != TmdContentRecordType_DLC && tmd_contents[i].type != TmdContentRecordType_Shared)
         {
             ERROR_MSG("Invalid content type!");
@@ -284,14 +284,38 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         }
         
         /* Generate output path for the current content. */
-        os_snprintf(entry_path, MAX_ELEMENTS(entry_path), OS_PRINT_STR OS_PATH_SEPARATOR "%08" PRIx16 ".app", out_dir, tmd_contents[i].index);
+        os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%08" PRIx16 ".app", tmd_contents[i].index);
         
-        /* Save decrypted content file. */
-        if (!wadSaveContentFileFromInstallablePackage(wad_fd, dec_titlekey, content_iv, &(tmd_contents[i]), entry_path))
+        /* Unpack content. */
+        size_t aligned_cnt_size = 0;
+        if (!wadUnpackContentFromInstallablePackage(wad_fd, dec_titlekey, cnt_iv, tmd_contents[i].size, tmd_contents[i].hash, out_path, &aligned_cnt_size))
         {
-            ERROR_MSG("Failed to save decrypted content file \"%08" PRIx16 ".app\" from \"" OS_PRINT_STR "\"!", tmd_contents[i].index, wad_path);
-            goto out;
+            os_remove(out_path);
+            
+            if (tid_upper == TITLE_TYPE_DLC && i < (content_count - 1))
+            {
+                printf("Data at WAD offset 0x%zx doesn't match content index %04" PRIx16 ".\n\n", wad_offset, tmd_contents[i].index);
+                
+                /* Seek back to the start of the current content file. We'll retry again with the next content record. */
+                os_fseek(wad_fd, wad_offset, SEEK_SET);
+            } else {
+                ERROR_MSG("Failed to save decrypted content file \"%08" PRIx16 ".app\" from \"" OS_PRINT_STR "\"!", tmd_contents[i].index, wad_path);
+                goto out;
+            }
         }
+        
+        /* Update WAD offset. */
+        wad_offset += aligned_cnt_size;
+        
+        /* Print unpacked content info. */
+        printf("  TMD content #%u:\n", i + 1);
+        printf("    Content ID:           %08" PRIx32 ".\n", tmd_contents[i].content_id);
+        printf("    Content index:        %04" PRIx16 ".\n", tmd_contents[i].index);
+        printf("    Content type:         %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
+        printf("    Content size:         0x%" PRIx64 ".\n", tmd_contents[i].size);
+        utilsPrintHexData("    Content SHA-1 hash:   ", tmd_contents[i].hash, SHA1_HASH_SIZE);
+        utilsPrintHexData("    Content IV:           ", cnt_iv, AES_BLOCK_SIZE);
+        printf("\n");
         
         /* Restore byteswapped content record fields. */
         tmdByteswapTitleMetadataContentRecordFields(&(tmd_contents[i]));
@@ -315,6 +339,10 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, const os_char_t *out
         *out_tmd_size = wad_header.tmd_size;
     }
     
+    if (out_dec_titlekey) memcpy(out_dec_titlekey, dec_titlekey, AES_BLOCK_SIZE);
+    
+    if (out_tid_upper) *out_tid_upper = tid_upper;
+    
     success = true;
     
 out:
@@ -326,19 +354,130 @@ out:
     
     if (wad_fd) fclose(wad_fd);
     
+    out_path[out_path_len] = (os_char_t)0;
+    
     return success;
 }
 
-static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 titlekey[AES_BLOCK_SIZE], const u8 iv[AES_BLOCK_SIZE], const TmdContentRecord *content_record, const os_char_t *out_path)
+bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, size_t cnt_size, size_t *out_aligned_cnt_size)
 {
-    if (!wad_file || !titlekey || !iv || !content_record || !out_path || !os_strlen(out_path))
+    if (!wad_fd || !titlekey || !iv || !cnt_fd || cnt_idx >= TMD_MAX_CONTENT_COUNT || !cnt_size || !out_aligned_cnt_size)
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
     u8 *buf = NULL;
-    size_t blksize = CONTENT_BLOCKSIZE;
+    size_t blksize = WAD_CONTENT_BLOCKSIZE;
+    size_t res = 0, write_size = 0;
+    
+    CryptoAes128CbcContext aes_ctx = {0};
+    
+    bool success = false, aes_ctx_init = false;
+    
+    /* Allocate memory for the process. */
+    buf = malloc(blksize);
+    if (!buf)
+    {
+        ERROR_MSG("Failed to allocate memory for the write procedure!");
+        return false;
+    }
+    
+    /* Initialize AES-128-CBC context. */
+    aes_ctx_init = cryptoAes128CbcContextInit(&aes_ctx, titlekey, iv, true);
+    if (!aes_ctx_init)
+    {
+        ERROR_MSG("Failed to initialize AES-128-CBC context!");
+        goto out;
+    }
+    
+    /* Process content data. */
+    for(size_t offset = 0; offset < cnt_size; offset += blksize)
+    {
+        /* Handle last plaintext chunk size. */
+        if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
+        
+        /* Read plaintext chunk. */
+        res = fread(buf, 1, blksize, cnt_fd);
+        if (res != blksize)
+        {
+            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes plaintext chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"!", blksize, offset, cnt_idx);
+            goto out;
+        }
+        
+        /* Check if the current chunk isn't aligned to the AES block size. */
+        write_size = ALIGN_UP(blksize, AES_BLOCK_SIZE);
+        if (write_size > blksize) memset(buf + blksize, 0, write_size - blksize);
+        
+        /* Encrypt chunk. */
+        if (!cryptoAes128CbcContextCrypt(&aes_ctx, buf, buf, write_size, true))
+        {
+            ERROR_MSG("Failed to encrypt 0x%" PRIx64 " bytes chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"!", write_size, offset, cnt_idx);
+            goto out;
+        }
+        
+        if (sha1_ctx)
+        {
+            /* Update SHA-1 hash calculation. */
+            mbedtls_sha1_update(sha1_ctx, buf, write_size);
+        }
+        
+        /* Write encrypted chunk. */
+        res = fwrite(buf, 1, write_size, wad_fd);
+        if (res != write_size)
+        {
+            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes encrypted chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"!", write_size, offset, cnt_idx);
+            goto out;
+        }
+        
+        /* Flush data. */
+        fflush(wad_fd);
+    }
+    
+    /* Write padding if necessary. */
+    size_t aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
+    if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
+    {
+        size_t new_aligned_cnt_size = aligned_cnt_size;
+        
+        if (!utilsWritePadding(wad_fd, &new_aligned_cnt_size, WAD_BLOCK_SIZE))
+        {
+            ERROR_MSG("Failed to write pad block for content \"%08" PRIx16 ".app\"!", cnt_idx);
+            goto out;
+        }
+        
+        if (sha1_ctx)
+        {
+            /* Update SHA-1 hash calculation. */
+            u8 padding[WAD_BLOCK_SIZE] = {0};
+            mbedtls_sha1_update(sha1_ctx, padding, new_aligned_cnt_size - aligned_cnt_size);
+        }
+        
+        aligned_cnt_size = new_aligned_cnt_size;
+    }
+    
+    *out_aligned_cnt_size = aligned_cnt_size;
+    
+    success = true;
+    
+out:
+    if (aes_ctx_init) cryptoAes128CbcContextFree(&aes_ctx);
+    
+    if (buf) free(buf);
+    
+    return success;
+}
+
+static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, size_t cnt_size, const u8 *cnt_hash, const os_char_t *out_path, size_t *out_aligned_cnt_size)
+{
+    if (!wad_fd || !titlekey || !iv || !cnt_size || !cnt_hash || !out_path || !os_strlen(out_path) || !out_aligned_cnt_size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    u8 *buf = NULL;
+    size_t blksize = WAD_CONTENT_BLOCKSIZE;
     size_t res = 0, read_size = 0;
     
     CryptoAes128CbcContext aes_ctx = {0};
@@ -379,15 +518,15 @@ static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 ti
         goto out;
     }
     
-    /* Copy content data. */
-    for(size_t offset = 0; offset < content_record->size; offset += blksize)
+    /* Process content data. */
+    for(size_t offset = 0; offset < cnt_size; offset += blksize)
     {
         /* Handle last encrypted chunk size. */
-        if (blksize > (content_record->size - offset)) blksize = (content_record->size - offset);
+        if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
         
         /* Read encrypted chunk. */
         read_size = ALIGN_UP(blksize, AES_BLOCK_SIZE);
-        res = fread(buf, 1, read_size, wad_file);
+        res = fread(buf, 1, read_size, wad_fd);
         if (res != read_size)
         {
             ERROR_MSG("Failed to read 0x%" PRIx64 " bytes encrypted chunk from content offset 0x%" PRIx64 "!", read_size, offset);
@@ -420,14 +559,22 @@ static bool wadSaveContentFileFromInstallablePackage(FILE *wad_file, const u8 ti
     mbedtls_sha1_finish(&sha1_ctx, hash);
     
     /* Compare checksums. */
-    if (memcmp(hash, content_record->hash, SHA1_HASH_SIZE) != 0)
+    if (memcmp(hash, cnt_hash, SHA1_HASH_SIZE) != 0)
     {
         ERROR_MSG("SHA-1 checksum mismatch!");
         goto out;
     }
     
     /* Update file stream position if necessary. */
-    if (!IS_ALIGNED(content_record->size, WAD_BLOCK_SIZE)) os_fseek(wad_file, ALIGN_UP(content_record->size, WAD_BLOCK_SIZE) - ALIGN_UP(content_record->size, AES_BLOCK_SIZE), SEEK_CUR);
+    size_t aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
+    if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
+    {
+        size_t new_aligned_cnt_size = ALIGN_UP(aligned_cnt_size, WAD_BLOCK_SIZE);
+        os_fseek(wad_fd, new_aligned_cnt_size - aligned_cnt_size, SEEK_CUR);
+        aligned_cnt_size = new_aligned_cnt_size;
+    }
+    
+    *out_aligned_cnt_size = aligned_cnt_size;
     
     success = true;
     

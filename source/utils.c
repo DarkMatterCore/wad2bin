@@ -342,3 +342,19 @@ bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment)
     
     return true;
 }
+
+void utilsGenerateAsciiStringFromTitleIdLower(u64 title_id, char *out)
+{
+    if (!out) return;
+    
+    u8 i = 0;
+    u32 tid_lower = TITLE_LOWER(title_id);
+    
+    for(i = 0; i < 4; i++)
+    {
+        out[i] = (char)((u8)(tid_lower >> (24 - (i * 8))) & 0xFF);
+        if (out[i] < 0x20 || out[i] > 0x7E) out[i] = '.';
+    }
+    
+    out[i] = '\0';
+}

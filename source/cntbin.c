@@ -22,41 +22,36 @@
 #include "utils.h"
 #include "keys.h"
 #include "u8.h"
-#include "tik.h"
 #include "cntbin.h"
 
-#define CONTENT_PRIVATE_PATH    OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR "title" OS_PATH_SEPARATOR "%s" /* "%s" gets replaced by the ASCII conversion of the TID lower u32 */
 #define CONTENT_NAME            "content.bin"
 
-#define UNKNOWN_LOW_TID         (u32)0x57444645         /* "WDFE". Used by BannerBomb. */
+#define UNKNOWN_TID_LOWER       (u32)0x57444645         /* "WDFE". Used by BannerBomb. */
 #define REF_TID_1               (u64)0x0001000157424D45 /* 10001-WBME. Used by BannerBomb. */
 #define REF_TID_2               (u64)0x000100014E414A4E /* 10001-NAJN. Used by BannerBomb. */
 
-static bool cntbinWriteContent(FILE *content_bin, const u8 *key, const u8 *iv, mbedtls_sha1_context *sha1_ctx, const os_char_t *cnt_path, size_t cnt_size);
-
-bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_file_path, const os_char_t *device_cert_path, const os_char_t *wad_path, os_char_t *out_path, os_char_t *tmp_path)
+bool cntbinGenerateFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 **tmd, size_t *tmd_size)
 {
-    size_t out_path_len = os_strlen(out_path), new_out_path_len = 0;
-    size_t tmp_path_len = os_strlen(tmp_path);
+    size_t unpacked_wad_path_len = 0;
+    size_t out_path_len = 0, new_out_path_len = 0;
+    
+    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !*tmd || !tmd_size || !*tmd_size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    TmdCommonBlock *tmd_common_block = NULL;
+    TmdContentRecord *tmd_contents = NULL;
+    
+    u16 content_count = 0;
+    u8 cnt_iv[AES_BLOCK_SIZE] = {0};
     
     u32 console_id = 0;
     u8 *sd_key = NULL, *sd_iv = NULL, *md5_blanker = NULL, *ecc_private_key = NULL, *prng_key = NULL;
     CertSigEcc480PubKeyEcc480 *device_cert = NULL;
     
-    u8 *ticket = NULL;
-    size_t ticket_size = 0;
-    //TikCommonBlock *tik_common_block = NULL;
-    
-    u8 *tmd = NULL;
-    size_t tmd_size = 0;
-    TmdCommonBlock *tmd_common_block = NULL;
-    TmdContentRecord *tmd_contents = NULL;
-    u16 content_count = 0;
-    u8 content_iv[AES_BLOCK_SIZE] = {0};
-    
-    u64 title_id = 0;
-    u32 low_tid = 0;
-    char low_tid_ascii[5] = {0};
+    char tid_lower_ascii[5] = {0};
     
     FILE *opening_bnr = NULL;
     u8 *icon_bin = NULL;
@@ -71,12 +66,8 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     WadBackupPackageHeader bk_header = {0};
     size_t content_data_size = 0, backup_area_size = 0;
     
-    /* SHA-1 context used to calculate a checksum over the backup area. */
-    /* Needed to generate the ECSDA signature at the start of Part F. */
     mbedtls_sha1_context sha1_ctx = {0};
     u8 backup_area_hash[SHA1_HASH_SIZE] = {0};
-    mbedtls_sha1_init(&sha1_ctx);
-    mbedtls_sha1_starts(&sha1_ctx);
     
     CntBinCertArea cert_area = {0};
     u8 ap_private_key[ECC_PRIV_KEY_SIZE - 2] = {0};
@@ -87,11 +78,12 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     bool success = false;
     
-    /* Load keydata and device certificate. */
-    if (!keysLoadKeyDataAndDeviceCert(keys_file_path, device_cert_path)) return false;
-    printf("Keydata and device certificate successfully loaded.\n\n");
+    /* Retrieve TMD common block, contents and content count. */
+    tmd_common_block = tmdGetCommonBlockFromBuffer(*tmd, *tmd_size, NULL);
+    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    content_count = bswap_16(tmd_common_block->content_count);
     
-    /* Retrieve required keydata */
+    /* Retrieve required keydata. */
     console_id = keysGetConsoleId();
     sd_key = keysGetSdKey();
     sd_iv = keysGetSdIv();
@@ -100,32 +92,20 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     prng_key = keysGetPrngKey();
     device_cert = keysGetDeviceCertificate();
     
-    /* Unpack input WAD package. */
-    if (!wadUnpackInstallablePackage(wad_path, tmp_path, NULL, NULL, &ticket, &ticket_size, &tmd, &tmd_size)) return false;
-    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", wad_path);
+    /* Initialize SHA-1 context used to calculate a checksum over the backup area. */
+    /* Needed to generate the ECSDA signature at the start of Part F. */
+    mbedtls_sha1_init(&sha1_ctx);
+    mbedtls_sha1_starts(&sha1_ctx);
     
-    /* Retrieve ticket common block, TMD common block and TMD contents. */
-    //tik_common_block = tikGetCommonBlockFromBuffer(ticket, ticket_size, NULL);
-    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
-    tmd_contents = TMD_CONTENTS(tmd_common_block);
-    content_count = bswap_16(tmd_common_block->content_count);
-    
-    /* Get title ID and convert its lower u32 to ASCII. */
-    title_id = bswap_64(tmd_common_block->title_id);
-    low_tid = TITLE_LOWER(title_id);
-    
-    for(u8 i = 0; i < 4; i++)
-    {
-        low_tid_ascii[i] = (char)((u8)(low_tid >> (24 - (i * 8))) & 0xFF);
-        if (low_tid_ascii[i] < 0x20 || low_tid_ascii[i] > 0x7E) low_tid_ascii[i] = '.';
-    }
+    /* Convert the Title ID lower u32 to ASCII. */
+    utilsGenerateAsciiStringFromTitleIdLower(bswap_64(tmd_common_block->title_id), tid_lower_ascii);
     
     /* Open 00000000.app content file (opening.bnr). */
-    os_snprintf(tmp_path + tmp_path_len, MAX_PATH - tmp_path_len, OS_PATH_SEPARATOR "00000000.app");
-    opening_bnr = os_fopen(tmp_path, OS_MODE_READ);
+    os_snprintf(unpacked_wad_path + unpacked_wad_path_len, MAX_PATH - unpacked_wad_path_len, OS_PATH_SEPARATOR "00000000.app");
+    opening_bnr = os_fopen(unpacked_wad_path, OS_MODE_READ);
     if (!opening_bnr)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode!", tmp_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode!", unpacked_wad_path);
         return false;
     }
     
@@ -133,7 +113,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     res = fread(&cntbin_header, 1, sizeof(CntBinHeader), opening_bnr);
     if (res != sizeof(CntBinHeader))
     {
-        ERROR_MSG("Failed to read IMET header from \"" OS_PRINT_STR "\"!", tmp_path);
+        ERROR_MSG("Failed to read IMET header from \"" OS_PRINT_STR "\"!", unpacked_wad_path);
         goto out;
     }
     
@@ -150,7 +130,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
         cntbin_header.imet_header.file_count != bswap_32(IMET_FILE_COUNT) || !cntbin_header.imet_header.icon_bin_size || !cntbin_header.imet_header.banner_bin_size || \
         !cntbin_header.imet_header.sound_bin_size || memcmp(imet_hash, calc_imet_hash, MD5_HASH_SIZE) != 0)
     {
-        ERROR_MSG("Invalid IMET header in \"" OS_PRINT_STR "\"!", tmp_path);
+        ERROR_MSG("Invalid IMET header in \"" OS_PRINT_STR "\"!", unpacked_wad_path);
         goto out;
     }
     
@@ -193,7 +173,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     printf("\n");
     
     /* Generate output path. */
-    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, CONTENT_PRIVATE_PATH, low_tid_ascii);
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, PRIVATE_PATH("title"), tid_lower_ascii);
     utilsCreateDirectoryTree(out_path);
     
     new_out_path_len = os_strlen(out_path);
@@ -211,9 +191,9 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     cntbin_header.title_id = tmd_common_block->title_id;
     cntbin_header.icon_bin_size = bswap_32((u32)icon_bin_size);
     memcpy(cntbin_header.header_hash, md5_blanker, MD5_HASH_SIZE);
-    cntbin_header.unknown_low_tid = bswap_32(UNKNOWN_LOW_TID);
-    cntbin_header.ref_title_id_1 = bswap_64(REF_TID_1);
-    cntbin_header.ref_title_id_2 = bswap_64(REF_TID_2);
+    cntbin_header.unknown_tid_lower = bswap_32(UNKNOWN_TID_LOWER);
+    cntbin_header.ref_tid_1 = bswap_64(REF_TID_1);
+    cntbin_header.ref_tid_2 = bswap_64(REF_TID_2);
     
     /* Reallocate icon.bin buffer (if necessary). */
     /* We need to do this if the icon.bin size isn't aligned to the WAD block size. */
@@ -280,12 +260,12 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     bk_header.type = (u16)WadType_BackupPackage;
     bk_header.version = (u16)WadVersion_BackupPackage;
     bk_header.console_id = console_id;
-    bk_header.content_tmd_size = (u32)tmd_size;
+    bk_header.content_tmd_size = (u32)*tmd_size;
     
     /* Calculate content data size and generate the included contents bitfield. */
     for(u16 i = 0; i < content_count; i++)
     {
-        /* TODO: check if shared/DLC content inclusion actually works. */
+        /* TODO: check if shared content inclusion actually works. */
         /* If not, they must be discarded here. */
         //if (bswap_16(tmd_contents[i].type) != TmdContentRecordType_Normal) continue;
         content_data_size += ALIGN_UP(bswap_64(tmd_contents[i].size), WAD_BLOCK_SIZE);
@@ -295,7 +275,7 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     bk_header.content_data_size = (u32)content_data_size;
     
     /* Calculate backup area size. */
-    backup_area_size = (sizeof(WadBackupPackageHeader) + ALIGN_UP(tmd_size, WAD_BLOCK_SIZE) + content_data_size + sizeof(CntBinCertArea));
+    backup_area_size = (sizeof(WadBackupPackageHeader) + ALIGN_UP(*tmd_size, WAD_BLOCK_SIZE) + content_data_size + sizeof(CntBinCertArea));
     bk_header.backup_area_size = (u32)backup_area_size;
     
     /* Print content.bin backup WAD header (Part C) information. */
@@ -328,61 +308,75 @@ bool cntbinConvertInstallableWadPackageToBackupPackage(const os_char_t *keys_fil
     
     /* Reallocate TMD buffer (if necessary). */
     /* We need to do this if the TMD size isn't aligned to the WAD block size. */
-    if (!utilsAlignBuffer((void**)&tmd, &tmd_size, WAD_BLOCK_SIZE))
+    if (!utilsAlignBuffer((void**)tmd, tmd_size, WAD_BLOCK_SIZE))
     {
         ERROR_MSG("Failed to align TMD buffer to WAD block size!");
         goto out;
     }
     
     /* Write plaintext TMD (Part D). */
-    res = fwrite(tmd, 1, tmd_size, content_bin);
-    if (res != tmd_size)
+    res = fwrite(*tmd, 1, *tmd_size, content_bin);
+    if (res != *tmd_size)
     {
         ERROR_MSG("Failed to write plaintext TMD (Part D) to \"" OS_PRINT_STR "\"!", out_path);
         goto out;
     }
     
     /* Update content.bin offset. */
-    content_bin_offset += tmd_size;
+    content_bin_offset += *tmd_size;
     
     /* Update SHA-1 hash calculation. */
-    mbedtls_sha1_update(&sha1_ctx, tmd, tmd_size);
+    mbedtls_sha1_update(&sha1_ctx, *tmd, *tmd_size);
     
     /* Process content files (Part E). */
     printf("content.bin content data (Part E):\n");
     for(u16 i = 0; i < content_count; i++)
     {
-        u16 content_index = bswap_16(tmd_contents[i].index);
-        size_t content_size = bswap_64(tmd_contents[i].size);
+        FILE *cnt_fd = NULL;
+        u16 cnt_idx = bswap_16(tmd_contents[i].index);
+        size_t cnt_size = bswap_64(tmd_contents[i].size);
+        size_t aligned_cnt_size = 0;
+        bool write_res = false;
         
-        /* TODO: check if shared/DLC content inclusion actually works. */
+        /* TODO: check if shared content inclusion actually works. */
         /* If not, they must be discarded here. */
-        //u16 content_type = bswap_16(tmd_contents[i].type);
-        //if (content_type != TmdContentRecordType_Normal) continue;
+        //if (bswap_16(tmd_contents[i].type) != TmdContentRecordType_Normal) continue;
         
         /* Generate content IV. */
-        memset(content_iv, 0, AES_BLOCK_SIZE);
-        memcpy(content_iv, &(tmd_contents[i].index), sizeof(u16));
+        memset(cnt_iv, 0, AES_BLOCK_SIZE);
+        memcpy(cnt_iv, &(tmd_contents[i].index), sizeof(u16));
         
         /* Generate input path for the current content. */
-        os_snprintf(tmp_path + tmp_path_len, MAX_PATH - tmp_path_len, OS_PATH_SEPARATOR "%08" PRIx16 ".app", content_index);
+        os_snprintf(unpacked_wad_path + unpacked_wad_path_len, MAX_PATH - unpacked_wad_path_len, OS_PATH_SEPARATOR "%08" PRIx16 ".app", cnt_idx);
         
-        /* Print content information. */
-        printf("  Content #%u:\n", content_index + 1);
-        printf("    Offset:               0x%" PRIx64 ".\n", os_ftell(content_bin));
-        printf("    Size (unpacked):      0x%zx.\n", content_size);
-        printf("    Size (encrypted):     0x%zx.\n", ALIGN_UP(content_size, AES_BLOCK_SIZE));
-        printf("    Size (padded):        0x%zx.\n\n", ALIGN_UP(content_size, WAD_BLOCK_SIZE));
-        
-        /* Write encrypted content file. */
-        if (!cntbinWriteContent(content_bin, prng_key, content_iv, &sha1_ctx, tmp_path, content_size))
+        /* Open content file. */
+        cnt_fd = os_fopen(unpacked_wad_path, OS_MODE_READ);
+        if (!cnt_fd)
         {
-            ERROR_MSG("Failed to write encrypted content file \"%08" PRIx16 ".app\"!", content_index);
+            ERROR_MSG("Failed to open unpacked content \"" OS_PRINT_STR "\" in read mode!", unpacked_wad_path);
             goto out;
         }
         
+        /* Write encrypted content file. */
+        write_res = wadWriteUnpackedContentToPackage(content_bin, prng_key, cnt_iv, &sha1_ctx, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
+        if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
+        
+        /* Close content file. */
+        fclose(cnt_fd);
+        cnt_fd = NULL;
+        
+        /* Stop process if there was an error. */
+        if (!write_res) goto out;
+        
         /* Update content.bin offset. */
-        content_bin_offset += ALIGN_UP(content_size, WAD_BLOCK_SIZE);
+        content_bin_offset += aligned_cnt_size;
+        
+        /* Print content information. */
+        printf("  Content #%u:\n", cnt_idx + 1);
+        printf("    Offset:               0x%" PRIx64 ".\n", os_ftell(content_bin));
+        printf("    Size (unpacked):      0x%zx.\n", cnt_size);
+        printf("    Size (encrypted):     0x%zx.\n", ALIGN_UP(cnt_size, AES_BLOCK_SIZE));
+        printf("    Size (padded):        0x%zx.\n\n", aligned_cnt_size);
     }
     
     /* Retrieve backup area hash. */
@@ -438,132 +432,17 @@ out:
     
     if (opening_bnr) fclose(opening_bnr);
     
-    if (tmd) free(tmd);
-    
-    if (ticket) free(ticket);
-    
     mbedtls_sha1_free(&sha1_ctx);
     
-    tmp_path[tmp_path_len] = (os_char_t)0;
-    utilsRemoveDirectoryRecursively(tmp_path);
-    
-    if (!success)
+    if (!success && new_out_path_len > 0)
     {
-        os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "private");
+        /* Remove the last subdirectory from the directory tree we created. */
+        out_path[new_out_path_len] = (os_char_t)0;
         utilsRemoveDirectoryRecursively(out_path);
     }
     
     out_path[out_path_len] = (os_char_t)0;
-    
-    return success;
-}
-
-static bool cntbinWriteContent(FILE *content_bin, const u8 *key, const u8 *iv, mbedtls_sha1_context *sha1_ctx, const os_char_t *cnt_path, size_t cnt_size)
-{
-    if (!content_bin || !key || !iv || !sha1_ctx || !cnt_path || !os_strlen(cnt_path) || !cnt_size)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    u8 *buf = NULL;
-    size_t blksize = CONTENT_BLOCKSIZE;
-    size_t res = 0, write_size = 0;
-    
-    CryptoAes128CbcContext aes_ctx = {0};
-    
-    FILE *cnt_fd = NULL;
-    
-    bool success = false, aes_ctx_init = false;
-    
-    /* Allocate memory for the process. */
-    buf = malloc(blksize);
-    if (!buf)
-    {
-        ERROR_MSG("Failed to allocate memory for the write procedure!");
-        return false;
-    }
-    
-    /* Initialize AES-128-CBC context. */
-    aes_ctx_init = cryptoAes128CbcContextInit(&aes_ctx, key, iv, true);
-    if (!aes_ctx_init)
-    {
-        ERROR_MSG("Failed to initialize AES-128-CBC context!");
-        goto out;
-    }
-    
-    /* Open input content file. */
-    cnt_fd = os_fopen(cnt_path, OS_MODE_READ);
-    if (!cnt_fd)
-    {
-        ERROR_MSG("Failed to open content file \"" OS_PRINT_STR "\"in read mode!", cnt_path);
-        goto out;
-    }
-    
-    /* Copy content data. */
-    for(size_t offset = 0; offset < cnt_size; offset += blksize)
-    {
-        /* Handle last plaintext chunk size. */
-        if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
-        
-        /* Read plaintext chunk. */
-        res = fread(buf, 1, blksize, cnt_fd);
-        if (res != blksize)
-        {
-            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes plaintext chunk at offset 0x%" PRIx64 " from content \"" OS_PRINT_STR "\"!", blksize, offset, cnt_path);
-            goto out;
-        }
-        
-        /* Check if the current chunk isn't aligned to the AES block size. */
-        write_size = ALIGN_UP(blksize, AES_BLOCK_SIZE);
-        if (write_size > blksize) memset(buf + blksize, 0, write_size - blksize);
-        
-        /* Encrypt chunk. */
-        if (!cryptoAes128CbcContextCrypt(&aes_ctx, buf, buf, write_size, true))
-        {
-            ERROR_MSG("Failed to encrypt 0x%" PRIx64 " bytes chunk at offset 0x%" PRIx64 " from content \"" OS_PRINT_STR "\"!", write_size, offset, cnt_path);
-            goto out;
-        }
-        
-        /* Update SHA-1 hash calculation. */
-        mbedtls_sha1_update(sha1_ctx, buf, write_size);
-        
-        /* Write encrypted chunk. */
-        res = fwrite(buf, 1, write_size, content_bin);
-        if (res != write_size)
-        {
-            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes encrypted chunk at offset 0x%" PRIx64 " from content \"" OS_PRINT_STR "\"!", write_size, offset, cnt_path);
-            goto out;
-        }
-        
-        /* Flush data. */
-        fflush(content_bin);
-    }
-    
-    /* Write padding if necessary. */
-    cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
-    if (!IS_ALIGNED(cnt_size, WAD_BLOCK_SIZE))
-    {
-        size_t new_cnt_size = cnt_size;
-        if (!utilsWritePadding(content_bin, &new_cnt_size, WAD_BLOCK_SIZE))
-        {
-            ERROR_MSG("Failed to write pad block for content \"" OS_PRINT_STR "\"!", cnt_path);
-            goto out;
-        }
-        
-        /* Update SHA-1 hash calculation. */
-        u8 padding[WAD_BLOCK_SIZE] = {0};
-        mbedtls_sha1_update(sha1_ctx, padding, new_cnt_size - cnt_size);
-    }
-    
-    success = true;
-    
-out:
-    if (cnt_fd) fclose(cnt_fd);
-    
-    if (aes_ctx_init) cryptoAes128CbcContextFree(&aes_ctx);
-    
-    if (buf) free(buf);
+    unpacked_wad_path[unpacked_wad_path_len] = (os_char_t)0;
     
     return success;
 }

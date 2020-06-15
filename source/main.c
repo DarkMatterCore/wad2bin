@@ -20,6 +20,7 @@
  */
 
 #include "utils.h"
+#include "keys.h"
 #include "cntbin.h"
 
 #define ARG_COUNT   4
@@ -30,16 +31,28 @@ int main(int argc, char **argv)
     
     /* Reserve memory for an extra temporary path. */
     os_char_t *paths[ARG_COUNT + 1] = {0};
-    bool res = false;
+    
+    u8 *cert_chain = NULL;
+    size_t cert_chain_size = 0;
+    
+    u8 *ticket = NULL;
+    size_t ticket_size = 0;
+    
+    u8 *tmd = NULL;
+    size_t tmd_size = 0, aligned_tmd_size = 0;
+    
+    u32 tid_upper = 0;
+    
+    u8 dec_titlekey[AES_BLOCK_SIZE] = {0};
     
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
-    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_LENGTH) >= MAX_PATH)
+    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH)
     {
         printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
-        printf("The required directory tree for the content.bin file will be created at the output directory.\n");
+        printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
         printf("You can set your SD card root directory as the output directory.\n");
         ret = -1;
         goto out;
@@ -84,6 +97,41 @@ int main(int argc, char **argv)
         }
     }
     
+    /* Load keydata and device certificate. */
+    if (!keysLoadKeyDataAndDeviceCert(paths[0], paths[1]))
+    {
+        ret = -4;
+        goto out;
+    }
+    
+    printf("Keydata and device certificate successfully loaded.\n\n");
+    
+    /* Unpack input WAD package. */
+    if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, dec_titlekey, &tid_upper))
+    {
+        ret = -5;
+        goto out;
+    }
+    
+    printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
+    
+    aligned_tmd_size = tmd_size;
+    
+    if (tid_upper == TITLE_TYPE_DLC)
+    {
+        
+        
+        
+        
+        
+    } else {
+        /* Generate content.bin file. */
+        if (!cntbinGenerateFromUnpackedInstallableWadPackage(paths[4], paths[3], &tmd, &aligned_tmd_size))
+        {
+            ret = -7;
+            goto out;
+        }
+    }
     
     
     
@@ -92,15 +140,17 @@ int main(int argc, char **argv)
     
     
     
-    
-    
-    
-    
-    /* Start conversion procedure. */
-    res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4]);
-    if (!res) ret = -4;
     
 out:
+    if (tmd) free(tmd);
+    
+    if (ticket) free(ticket);
+    
+    if (cert_chain) free(cert_chain);
+    
+    /* Remove unpacked WAD directory. */
+    utilsRemoveDirectoryRecursively(paths[4]);
+    
     for(u32 i = 0; i <= ARG_COUNT; i++)
     {
         if (paths[i]) free(paths[i]);
