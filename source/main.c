@@ -3,14 +3,14 @@
  *
  * Copyright (c) 2020, DarkMatterCore <pabloacurielz@gmail.com>.
  *
- * This file is part of wad2cntbin (https://github.com/DarkMatterCore/wad2cntbin).
+ * This file is part of wad2bin (https://github.com/DarkMatterCore/wad2bin).
  *
- * wad2cntbin is free software: you can redistribute it and/or modify
+ * wad2bin is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * wad2cntbin is distributed in the hope that it will be useful,
+ * wad2bin is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     os_char_t *paths[ARG_COUNT + 1] = {0};
     bool res = false;
     
-    printf("\nwad2cntbin v%s (c) DarkMatterCore.\n", VERSION);
+    printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
     if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_LENGTH) >= MAX_PATH)
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
         if (i == ARG_COUNT)
         {
             /* Save temporary path and create it. */
-            os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2cntbin_wad_data");
+            os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2bin_wad_data");
             os_mkdir(paths[i], 0777);
         } else {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -84,6 +84,18 @@ int main(int argc, char **argv)
         }
     }
     
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     /* Start conversion procedure. */
     res = cntbinConvertInstallableWadPackageToBackupPackage(paths[0], paths[1], paths[2], paths[3], paths[4]);
     if (!res) ret = -4;
@@ -96,5 +108,3 @@ out:
     
     return ret;
 }
-
-

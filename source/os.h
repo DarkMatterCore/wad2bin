@@ -3,14 +3,14 @@
  *
  * Copyright (c) 2020, DarkMatterCore <pabloacurielz@gmail.com>.
  *
- * This file is part of wad2cntbin (https://github.com/DarkMatterCore/wad2cntbin).
+ * This file is part of wad2bin (https://github.com/DarkMatterCore/wad2bin).
  *
- * wad2cntbin is free software: you can redistribute it and/or modify
+ * wad2bin is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * wad2cntbin is distributed in the hope that it will be useful,
+ * wad2bin is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -44,9 +44,9 @@
 #define IS_BIG_ENDIAN   (*((u16*)"\0\xff") < 0x100)
 
 /* Conditional byteswap macros to achieve endianness-agnostic integer handling. */
-#define bswap_16(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap16(val))
-#define bswap_32(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap32(val))
-#define bswap_64(val)   (IS_BIG_ENDIAN ? val : __builtin_bswap64(val))
+#define bswap_16(val)   (IS_BIG_ENDIAN ? (val) : __builtin_bswap16((val)))
+#define bswap_32(val)   (IS_BIG_ENDIAN ? (val) : __builtin_bswap32((val)))
+#define bswap_64(val)   (IS_BIG_ENDIAN ? (val) : __builtin_bswap64((val)))
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 typedef wchar_t os_char_t;   /// UTF-16.

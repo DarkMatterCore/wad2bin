@@ -1,9 +1,9 @@
 /config.mk
 /keys.txt
 /device.cert
-/wad2cntbin
-/wad2cntbin.exe
-/wad2cntbin_wad_data
+/wad2bin
+/wad2bin.exe
+/wad2bin_wad_data
 /private
 /content.bin
 *.wad

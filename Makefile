@@ -1,7 +1,7 @@
 TOPDIR	?=	$(CURDIR)
 include $(TOPDIR)/config.mk
 
-PROJECT_NAME	:=	wad2cntbin
+PROJECT_NAME	:=	wad2bin
 TARGET			:=	$(PROJECT_NAME)$(EXEEXT)
 
 # -Wno-implicit-fallthrough is used to suppress ConvertUTF.c warnings.
