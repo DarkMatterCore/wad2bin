@@ -15,7 +15,7 @@ Usage:
 --------------
 
 ```
-%s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]
+wad2bin <keys file> <device.cert> <input WAD> <output dir> [parent title ID]
 
 Paths must not exceed 1023 characters. Relative paths are supported.
 The required directory tree for the *.bin file(s) will be created at the output directory.
