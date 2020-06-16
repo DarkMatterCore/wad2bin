@@ -56,7 +56,7 @@ int main(int argc, char **argv)
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
         printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
         printf("You can set your SD card root directory as the output directory.\n");
-        printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n");
+        printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n\n");
         ret = -1;
         goto out;
     }
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
         }
     }
     
-    printf("Process finished!\n");
+    printf("Process finished!\n\n");
     
     
     

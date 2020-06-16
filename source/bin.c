@@ -374,7 +374,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     cert_area.ap_cert.sig_block.sig_type = bswap_32((u32)SignatureType_Ecc480Sha1);
     
     /* Set AP certificate signature issuer. */
-    snprintf(cert_area.ap_cert.sig_block.issuer, sizeof(cert_area.ap_cert.sig_block.issuer), "%s-%s", cert_area.device_cert.sig_block.issuer, cert_area.device_cert.cert_common_block.name);
+    snprintf(cert_area.ap_cert.sig_block.issuer, sizeof(cert_area.ap_cert.sig_block.issuer), "Root-CA00000001-MS00000002-NG%08" PRIx32, console_id);
     
     /* Set AP certificate public key type to ECC-B233. */
     cert_area.ap_cert.cert_common_block.pub_key_type = bswap_32((u32)CertPubKeyType_Ecc480);

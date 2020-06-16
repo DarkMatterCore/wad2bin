@@ -34,7 +34,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #endif
-#define ERROR_MSG(fmt, ...)             utilsPrintErrorMessage(__func__, fmt, ##__VA_ARGS__)
+#define ERROR_MSG(...)                  utilsPrintErrorMessage(__func__, ##__VA_ARGS__)
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
