@@ -34,7 +34,7 @@ int os_snprintf(os_char_t *out, size_t len, const char *fmt, ...)
     vsnprintf(tmp, MAX_PATH, fmt, args);
     va_end(args);
     
-    return swprintf(out, len, L"%hs", tmp);
+    return snwprintf(out, len, L"%hs", tmp);
 }
 
 #endif /* WIN32 || _WIN32 || __WIN32__ || __NT__ */

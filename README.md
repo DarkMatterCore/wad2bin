@@ -34,7 +34,7 @@ Differences between `content.bin` files and `<index>.bin` files:
 * `content.bin` files also hold a trailing certificate area placed after the encrypted contents, which contains:
     * An ECSDA signature calculated over the whole backup WAD package area (using the console-specific ECC private key).
     * A copy of the console-specific ECC-B233 device certificate (also known as "NG" cert).
-    * A title-issued ECC-B233 certificate (also known as "AP" cert), signed using the console-specific ECC private key. Its ECC public key it's an ECDH shared secret generated with a custom ECC private key. The issuer title is always the System Menu (00000001-00000002).
+    * A title-issued ECC-B233 certificate (also known as "AP" cert), signed using the console-specific ECC private key. Its ECC public key is an ECDH shared secret generated with a custom ECC private key. The issuer title is always the System Menu (00000001-00000002).
 * On the other hand, while `<index>.bin` files don't include any of the leading and trailing blocks from `content.bin` files, they are only allowed to hold a single encrypted content at a time, which index is used as part of the filename expressed in base 10 notation (e.g. `000.bin`).
 
 Dependencies:

@@ -380,7 +380,8 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     cert_area.ap_cert.cert_common_block.pub_key_type = bswap_32((u32)CertPubKeyType_Ecc480);
     
     /* Set AP certificate name. */
-    snprintf(cert_area.ap_cert.cert_common_block.name, sizeof(cert_area.ap_cert.cert_common_block.name), "AP%016" PRIx64, SYSTEM_MENU_TID);
+    u64 system_menu_tid = SYSTEM_MENU_TID;
+    snprintf(cert_area.ap_cert.cert_common_block.name, sizeof(cert_area.ap_cert.cert_common_block.name), "AP%08" PRIx32 "%08" PRIx32, TITLE_UPPER(system_menu_tid), TITLE_LOWER(system_menu_tid));
     
     /* Generate AP certificate public key using the AP private key. */
     cryptoGenerateEccPublicKey(ap_private_key, cert_area.ap_cert.pub_key_block.public_key);

@@ -2,4 +2,4 @@
 CC		:=	gcc
 
 # Leave EXEEXT empty if not compiling for Windows.
-EXEEXT	:=	.exe 
+EXEEXT	:=	.exe
