@@ -350,9 +350,9 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         /* Print content information. */
         printf("  Content #%u:\n", cnt_idx + 1);
         printf("    Offset:               0x%" PRIx64 ".\n", os_ftell(content_bin));
-        printf("    Size (unpacked):      0x%zx.\n", cnt_size);
-        printf("    Size (encrypted):     0x%zx.\n", ALIGN_UP(cnt_size, AES_BLOCK_SIZE));
-        printf("    Size (padded):        0x%zx.\n\n", aligned_cnt_size);
+        printf("    Size (unpacked):      0x%" PRIx64 ".\n", cnt_size);
+        printf("    Size (encrypted):     0x%" PRIx64 ".\n", ALIGN_UP(cnt_size, AES_BLOCK_SIZE));
+        printf("    Size (padded):        0x%" PRIx64 ".\n\n", aligned_cnt_size);
     }
     
     /* Retrieve backup area hash. */
