@@ -52,6 +52,10 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 Changelog:
 --------------
 
+**v0.4:**
+
+Fixed seeking after a missing content is detected while unpacking a DLC WAD.
+
 **v0.3:**
 
 Force the user to provide the full parent title ID for DLC WADs.
