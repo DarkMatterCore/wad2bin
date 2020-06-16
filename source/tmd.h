@@ -120,17 +120,17 @@ typedef struct {
 } TmdSigHmac160;
 
 /// Reads a TMD from a file and validates its signature size.
-u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size);
+u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size);
 
 /// Returns a pointer to the common TMD block from a TMD stored in a memory buffer.
 /// Optionally, it also saves the TMD type to an input pointer if provided.
-TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_tmd_type);
+TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_tmd_type);
 
 /// Check the system version field from a common TMD block to determine if it references an IOS version.
 bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block);
 
 /// Fakesigns a TMD stored in a buffer.
-void tmdFakesignTitleMetadata(void *buf, size_t buf_size);
+void tmdFakesignTitleMetadata(void *buf, u64 buf_size);
 
 /// Byteswaps fields from a TMD content record.
 ALWAYS_INLINE void tmdByteswapTitleMetadataContentRecordFields(TmdContentRecord *content_record)

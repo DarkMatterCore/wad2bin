@@ -58,14 +58,14 @@ typedef struct {
 bool cryptoAes128CbcContextInit(CryptoAes128CbcContext *ctx, const void *key, const void *iv, bool is_encryptor);
 void cryptoAes128CbcContextFree(CryptoAes128CbcContext *ctx);
 void cryptoAes128CbcContextResetIv(CryptoAes128CbcContext *ctx, const void *iv);
-bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt);
+bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, u64 size, bool encrypt);
 
 /// Simple all-in-one AES-128-CBC crypto function.
-bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, size_t size, bool encrypt);
+bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, u64 size, bool encrypt);
 
 /// Generates an ECSDA signature using the provided ECC private key.
 /// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.
-void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig);
+void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, u64 size, bool padded_sig);
 
 /// Same as cryptoGenerateEcsdaSignatureWithData, but takes an input SHA-1 hash instead of calculating it on its own over a provided memory block.
 void cryptoGenerateEcsdaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig);

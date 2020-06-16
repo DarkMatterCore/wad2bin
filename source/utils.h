@@ -69,21 +69,21 @@ void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
 bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src);
 
-bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, size_t expected_size);
+bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, u64 expected_size);
 
-bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t size);
+bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, u64 size);
 
-void utilsPrintHexData(const char *msg, const void *data, size_t size);
+void utilsPrintHexData(const char *msg, const void *data, u64 size);
 
-void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, size_t size);
+void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, u64 size);
 
 bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
 void utilsCreateDirectoryTree(const os_char_t *path);
 
-bool utilsWritePadding(FILE *fd, size_t *size, size_t alignment);
+bool utilsWritePadding(FILE *fd, u64 *size, u64 alignment);
 
-bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment);
+bool utilsAlignBuffer(void **buf, u64 *size, u64 alignment);
 
 void utilsGenerateAsciiStringFromTitleIdLower(u64 title_id, char *out);
 

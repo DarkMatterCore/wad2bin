@@ -95,16 +95,16 @@ typedef struct {
 } TikSigHmac160;
 
 /// Reads a ticket from a file and validates its signature size.
-u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size);
+u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size);
 
 /// Returns a pointer to the common ticket block from a ticket stored in a memory buffer.
 /// Optionally, it also saves the ticket type to an input pointer if provided.
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_ticket_type);
+TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_ticket_type);
 
 /// Checks the Title ID from a common ticket block to determine if the title is exportable.
 bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
 
 /// Fakesigns a ticket stored in a buffer.
-void tikFakesignTicket(void *buf, size_t buf_size);
+void tikFakesignTicket(void *buf, u64 buf_size);
 
 #endif /* __TIK_H__ */

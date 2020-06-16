@@ -25,9 +25,9 @@
 #define CERT_TYPE(sig)  (pub_key_type == CertPubKeyType_Rsa4096 ? CertType_Sig##sig##_PubKeyRsa4096 : \
                         (pub_key_type == CertPubKeyType_Rsa2048 ? CertType_Sig##sig##_PubKeyRsa2048 : CertType_Sig##sig##_PubKeyEcc480))
 
-static bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose);
+static bool certGetCertificateTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose);
 
-u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size)
+u8 *certReadRawCertificateChainFromFile(FILE *fd, u64 cert_chain_size)
 {
     if (!fd || cert_chain_size < CERT_MIN_SIZE)
     {
@@ -36,7 +36,7 @@ u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size)
     }
     
     u8 *raw_chain = NULL;
-    size_t res = 0, offset = 0;
+    u64 res = 0, offset = 0;
     u32 cert_num = 0;
     
     bool success = false;
@@ -63,7 +63,7 @@ u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size)
         if ((cert_chain_size - offset) < CERT_MIN_SIZE) break;
         
         u8 cert_type = 0;
-        size_t cert_size = 0;
+        u64 cert_size = 0;
         
         printf("Certificate #%u:\n", cert_num + 1);
         
@@ -97,7 +97,7 @@ out:
     return raw_chain;
 }
 
-CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, size_t buf_size)
+CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, u64 buf_size)
 {
     if (!buf || buf_size < CERT_MIN_SIZE)
     {
@@ -159,7 +159,7 @@ CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, size_t buf_s
     return cert_common_block;
 }
 
-static bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose)
+static bool certGetCertificateTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose)
 {
     if (!buf || buf_size < CERT_MIN_SIZE || (!out_type && !out_size))
     {
@@ -167,7 +167,7 @@ static bool certGetCertificateTypeAndSize(const void *buf, size_t buf_size, u8 *
         return false;
     }
     
-    size_t offset = 0;
+    u64 offset = 0;
     u8 type = CertType_None;
     const u8 *buf_u8 = (const u8*)buf;
     u32 sig_type = 0, pub_key_type = 0, date = 0;

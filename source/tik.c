@@ -23,9 +23,9 @@
 #include "tik.h"
 #include "crypto.h"
 
-static bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose);
+static bool tikGetTicketTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose);
 
-u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
+u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size)
 {
     if (!fd || ticket_size < TIK_MIN_SIZE)
     {
@@ -34,10 +34,10 @@ u8 *tikReadTicketFromFile(FILE *fd, size_t ticket_size)
     }
     
     u8 *ticket = NULL;
-    size_t res = 0;
+    u64 res = 0;
     
     u8 ticket_type = 0;
-    size_t ticket_detected_size = 0;
+    u64 ticket_detected_size = 0;
     
     bool success = false;
     
@@ -78,7 +78,7 @@ out:
     return ticket;
 }
 
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_ticket_type)
+TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_ticket_type)
 {
     if (!buf || buf_size < TIK_MIN_SIZE)
     {
@@ -134,7 +134,7 @@ bool tikIsTitleExportable(TikCommonBlock *tik_common_block)
     return (tid_upper == TITLE_TYPE_DOWNLOADABLE_CHANNEL || tid_upper == TITLE_TYPE_DISC_BASED_CHANNEL || tid_upper == TITLE_TYPE_DLC);
 }
 
-void tikFakesignTicket(void *buf, size_t buf_size)
+void tikFakesignTicket(void *buf, u64 buf_size)
 {
     if (!buf || buf_size < TIK_MIN_SIZE) return;
     
@@ -191,7 +191,7 @@ void tikFakesignTicket(void *buf, size_t buf_size)
     }
 }
 
-static bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose)
+static bool tikGetTicketTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose)
 {
     if (!buf || buf_size < TIK_MIN_SIZE || (!out_type && !out_size))
     {
@@ -200,7 +200,7 @@ static bool tikGetTicketTypeAndSize(const void *buf, size_t buf_size, u8 *out_ty
     }
     
     u32 sig_type = 0;
-    size_t offset = 0;
+    u64 offset = 0;
     u8 type = TikType_None;
     const u8 *buf_u8 = (const u8*)buf;
     

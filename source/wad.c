@@ -26,10 +26,10 @@
 
 #define WAD_CONTENT_BLOCKSIZE   0x800000    /* 8 MiB. */
 
-static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, size_t cnt_size, const u8 *cnt_hash, const os_char_t *out_path, size_t *out_aligned_cnt_size);
+static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, u64 cnt_size, const u8 *cnt_hash, const os_char_t *out_path, u64 *out_aligned_cnt_size);
 
-bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, size_t *out_cert_chain_size, u8 **out_tik, size_t *out_tik_size, u8 **out_tmd, \
-                                 size_t *out_tmd_size, u8 *out_dec_titlekey, u32 *out_tid_upper)
+bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, u64 *out_cert_chain_size, u8 **out_tik, u64 *out_tik_size, u8 **out_tmd, \
+                                 u64 *out_tmd_size, u8 *out_dec_titlekey, u32 *out_tid_upper)
 {
     size_t out_path_len = 0;
     
@@ -45,7 +45,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     bool save_tmd = (out_tmd && out_tmd_size);
     
     FILE *wad_fd = NULL;
-    size_t wad_offset = 0, wad_size = 0, calc_wad_size = 0, res = 0;
+    u64 wad_offset = 0, wad_size = 0, calc_wad_size = 0, res = 0;
     
     WadInstallablePackageHeader wad_header = {0};
     
@@ -269,7 +269,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     
     for(u16 i = 0; i < content_count && wad_offset < calc_wad_size; i++)
     {
-        size_t aligned_cnt_size = 0;
+        u64 aligned_cnt_size = 0;
         bool unpack_res = false;
         
         /* Generate content IV. */
@@ -368,7 +368,7 @@ out:
     return success;
 }
 
-bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, size_t cnt_size, size_t *out_aligned_cnt_size)
+bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, u64 cnt_size, u64 *out_aligned_cnt_size)
 {
     if (!wad_fd || !titlekey || !iv || !cnt_fd || cnt_idx >= TMD_MAX_CONTENT_COUNT || !cnt_size || !out_aligned_cnt_size)
     {
@@ -377,8 +377,8 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
     }
     
     u8 *buf = NULL;
-    size_t blksize = WAD_CONTENT_BLOCKSIZE;
-    size_t res = 0, write_size = 0;
+    u64 blksize = WAD_CONTENT_BLOCKSIZE;
+    u64 res = 0, write_size = 0;
     
     CryptoAes128CbcContext aes_ctx = {0};
     
@@ -401,7 +401,7 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
     }
     
     /* Process content data. */
-    for(size_t offset = 0; offset < cnt_size; offset += blksize)
+    for(u64 offset = 0; offset < cnt_size; offset += blksize)
     {
         /* Handle last plaintext chunk size. */
         if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
@@ -444,10 +444,10 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
     }
     
     /* Write padding if necessary. */
-    size_t aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
+    u64 aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
     if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
     {
-        size_t new_aligned_cnt_size = aligned_cnt_size;
+        u64 new_aligned_cnt_size = aligned_cnt_size;
         
         if (!utilsWritePadding(wad_fd, &new_aligned_cnt_size, WAD_BLOCK_SIZE))
         {
@@ -477,7 +477,7 @@ out:
     return success;
 }
 
-static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, size_t cnt_size, const u8 *cnt_hash, const os_char_t *out_path, size_t *out_aligned_cnt_size)
+static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, u64 cnt_size, const u8 *cnt_hash, const os_char_t *out_path, u64 *out_aligned_cnt_size)
 {
     if (!wad_fd || !titlekey || !iv || !cnt_size || !cnt_hash || !out_path || !os_strlen(out_path) || !out_aligned_cnt_size)
     {
@@ -486,8 +486,8 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     }
     
     u8 *buf = NULL;
-    size_t blksize = WAD_CONTENT_BLOCKSIZE;
-    size_t res = 0, read_size = 0;
+    u64 blksize = WAD_CONTENT_BLOCKSIZE;
+    u64 res = 0, read_size = 0;
     
     CryptoAes128CbcContext aes_ctx = {0};
     
@@ -528,7 +528,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     }
     
     /* Process content data. */
-    for(size_t offset = 0; offset < cnt_size; offset += blksize)
+    for(u64 offset = 0; offset < cnt_size; offset += blksize)
     {
         /* Handle last encrypted chunk size. */
         if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
@@ -575,10 +575,10 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     }
     
     /* Update file stream position if necessary. */
-    size_t aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
+    u64 aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
     if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
     {
-        size_t new_aligned_cnt_size = ALIGN_UP(aligned_cnt_size, WAD_BLOCK_SIZE);
+        u64 new_aligned_cnt_size = ALIGN_UP(aligned_cnt_size, WAD_BLOCK_SIZE);
         os_fseek(wad_fd, new_aligned_cnt_size - aligned_cnt_size, SEEK_CUR);
         aligned_cnt_size = new_aligned_cnt_size;
     }

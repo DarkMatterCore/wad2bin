@@ -30,7 +30,7 @@
 #define REF_TID_1               (u64)0x0001000157424D45 /* 10001-WBME. Used by BannerBomb. */
 #define REF_TID_2               (u64)0x000100014E414A4E /* 10001-NAJN. Used by BannerBomb. */
 
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size)
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
@@ -41,7 +41,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         return false;
     }
     
-    size_t aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
+    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
     TmdCommonBlock *tmd_common_block = NULL;
     TmdContentRecord *tmd_contents = NULL;
     
@@ -56,7 +56,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     
     FILE *opening_bnr = NULL;
     u8 *icon_bin = NULL;
-    size_t res = 0, icon_bin_size = 0;
+    u64 res = 0, icon_bin_size = 0;
     
     BinContentHeader cntbin_header = {0};
     u8 imet_hash[MD5_HASH_SIZE] = {0}, calc_imet_hash[MD5_HASH_SIZE] = {0}, cntbin_header_hash[MD5_HASH_SIZE] = {0};
@@ -65,7 +65,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     u8 imd5_hash[MD5_HASH_SIZE] = {0};
     
     WadBackupPackageHeader bk_header = {0};
-    size_t content_data_size = 0, backup_area_size = 0;
+    u64 content_data_size = 0, backup_area_size = 0;
     
     mbedtls_sha1_context sha1_ctx = {0};
     u8 backup_area_hash[SHA1_HASH_SIZE] = {0};
@@ -314,8 +314,8 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     {
         FILE *cnt_fd = NULL;
         u16 cnt_idx = bswap_16(tmd_contents[i].index);
-        size_t cnt_size = bswap_64(tmd_contents[i].size);
-        size_t aligned_cnt_size = 0;
+        u64 cnt_size = bswap_64(tmd_contents[i].size);
+        u64 aligned_cnt_size = 0;
         bool write_res = false;
         
         /* TODO: check if shared content inclusion actually works. */
@@ -423,7 +423,7 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size, u64 parent_tid)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
@@ -434,7 +434,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         return false;
     }
     
-    size_t aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
+    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
     TmdCommonBlock *tmd_common_block = NULL;
     TmdContentRecord *tmd_contents = NULL;
     
@@ -448,7 +448,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     char tid_lower_ascii[5] = {0};
     
     WadBackupPackageHeader bk_header = {0};
-    size_t res = 0;
+    u64 res = 0;
     
     bool success = false;
     
@@ -475,8 +475,8 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     {
         FILE *cnt_fd = NULL, *indexed_bin = NULL;
         u16 cnt_idx = bswap_16(tmd_contents[i].index);
-        size_t cnt_size = bswap_64(tmd_contents[i].size);
-        size_t aligned_cnt_size = 0;
+        u64 cnt_size = bswap_64(tmd_contents[i].size);
+        u64 aligned_cnt_size = 0;
         bool write_res = false;
         
         /* Generate content IV. */

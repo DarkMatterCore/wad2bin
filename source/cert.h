@@ -148,9 +148,9 @@ typedef struct {
 } CertSigHmac160PubKeyEcc480;
 
 /// Reads a raw certificate chain from a file and validates all signature and public key sizes.
-u8 *certReadRawCertificateChainFromFile(FILE *fd, size_t cert_chain_size);
+u8 *certReadRawCertificateChainFromFile(FILE *fd, u64 cert_chain_size);
 
 /// Returns a pointer to the common certificate block from a certificate stored in a memory buffer.
-CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, size_t buf_size);
+CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, u64 buf_size);
 
 #endif /* __CERT_H__ */

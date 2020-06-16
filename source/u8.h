@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
     FILE *u8_fd;
-    size_t header_offset;
+    u64 header_offset;
     U8Header u8_header;
     u32 node_count;
     U8Node *nodes;
@@ -74,10 +74,10 @@ U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
 
 /// Loads file data from an U8 file node into memory.
 /// The returned pointer must be freed by the user.
-u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size);
+u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, u64 *out_size);
 
 /// Simple all-in-one function to load file data from an U8 archive by its internal path.
-u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, size_t *out_size);
+u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, u64 *out_size);
 
 /// Byteswaps fields from an U8 header.
 ALWAYS_INLINE void u8ByteswapHeaderFields(U8Header *u8_header)

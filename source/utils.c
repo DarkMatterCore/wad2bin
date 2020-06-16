@@ -37,7 +37,7 @@ void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...)
 
 bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src)
 {
-    size_t src_len = 0, dst_len = 0;
+    u64 src_len = 0, dst_len = 0;
     
     const UTF8 *src_start = (const UTF8*)src;
     UTF16 *dst_start = (UTF16*)dst;
@@ -65,7 +65,7 @@ bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src)
     return true;
 }
 
-bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, size_t expected_size)
+bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, u64 expected_size)
 {
     if (!file_path || !os_strlen(file_path) || !buf || !expected_size)
     {
@@ -74,7 +74,7 @@ bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, size_t expecte
     }
     
     FILE *fd = NULL;
-    size_t file_size = 0, res = 0;
+    u64 file_size = 0, res = 0;
     bool success = false;
     
     /* Open file. */
@@ -113,7 +113,7 @@ out:
     return success;
 }
 
-bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t size)
+bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, u64 size)
 {
     if (!out_path || !os_strlen(out_path) || !buf || !size)
     {
@@ -122,7 +122,7 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t siz
     }
     
     FILE *fd = NULL;
-    size_t res = 0;
+    u64 res = 0;
     bool success = true;
     
     /* Open file. */
@@ -150,7 +150,7 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, size_t siz
     return success;
 }
 
-void utilsPrintHexData(const char *msg, const void *data, size_t size)
+void utilsPrintHexData(const char *msg, const void *data, u64 size)
 {
     if (!data || !size) return;
     
@@ -158,18 +158,18 @@ void utilsPrintHexData(const char *msg, const void *data, size_t size)
     
     const u8 *data_u8 = (const u8*)data;
     
-    for(size_t i = 0; i < size; i++) printf("%02" PRIx8, data_u8[i]);
+    for(u64 i = 0; i < size; i++) printf("%02" PRIx8, data_u8[i]);
     
     printf(".\n");
 }
 
-void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, size_t size)
+void utilsPrintUTF16BEString(const char *msg, u16 *utf16be_str, u64 size)
 {
     if (!utf16be_str || !size) return;
     
     if (msg && strlen(msg)) printf("%s", msg);
     
-    for(size_t i = 0; i < size && utf16be_str[i] != 0; i++) printf("%lc", bswap_16(utf16be_str[i]));
+    for(u64 i = 0; i < size && utf16be_str[i] != 0; i++) printf("%lc", bswap_16(utf16be_str[i]));
     
     printf(".\n");
 }
@@ -271,10 +271,10 @@ void utilsCreateDirectoryTree(const os_char_t *path)
     os_mkdir(path, 0777);
 }
 
-bool utilsWritePadding(FILE *fd, size_t *size, size_t alignment)
+bool utilsWritePadding(FILE *fd, u64 *size, u64 alignment)
 {
     u8 *pad = NULL;
-    size_t res = 0, pad_size = 0, new_size = 0;
+    u64 res = 0, pad_size = 0, new_size = 0;
     bool success = false;
     
     if (!fd || !size || !(new_size = *size) || !alignment)
@@ -311,10 +311,10 @@ out:
     return success;
 }
 
-bool utilsAlignBuffer(void **buf, size_t *size, size_t alignment)
+bool utilsAlignBuffer(void **buf, u64 *size, u64 alignment)
 {
     u8 *tmp_buf = NULL;
-    size_t pad_size = 0, new_size = 0;
+    u64 pad_size = 0, new_size = 0;
     
     if (!buf || !*buf || !size || !(new_size = *size) || !alignment)
     {

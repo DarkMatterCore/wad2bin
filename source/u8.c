@@ -38,7 +38,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     U8Node root_node = {0}, *nodes = NULL;
     u32 node_count = 0, node_section_size = 0, str_table_size = 0, cur_file_offset = 0;
     char *str_table = NULL;
-    size_t header_offset = 0, res = 0;
+    u64 header_offset = 0, res = 0;
     bool success = false;
     
     /* Save current offset. */
@@ -220,7 +220,7 @@ void u8ContextFree(U8Context *ctx)
 
 U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
 {
-    size_t path_len = 0;
+    u64 path_len = 0;
     char *path_dup = NULL, *pch = NULL;
     U8Node *dir_node = NULL;
     u32 node_idx = 0;
@@ -270,7 +270,7 @@ out:
 
 U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
 {
-    size_t path_len = 0;
+    u64 path_len = 0;
     char *path_dup = NULL, *filename = NULL;
     U8Node *dir_node = NULL, *file_node = NULL;
     u32 node_idx = 0;
@@ -328,7 +328,7 @@ out:
     return file_node;
 }
 
-u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size)
+u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, u64 *out_size)
 {
     if (!ctx || !ctx->u8_fd || !ctx->u8_header.data_offset || !file_node || file_node->properties.type != U8NodeType_File || file_node->data_offset < ctx->u8_header.data_offset || \
         !file_node->size || !out_size)
@@ -338,7 +338,7 @@ u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size)
     }
     
     u8 *buf = NULL;
-    size_t res = 0;
+    u64 res = 0;
     
     /* Allocate memory for the file buffer. */
     buf = malloc(file_node->size);
@@ -365,7 +365,7 @@ u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, size_t *out_size)
     return buf;
 }
 
-u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, size_t *out_size)
+u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, u64 *out_size)
 {
     if (!u8_fd || !file_path || !strlen(file_path) || !out_size)
     {
@@ -379,7 +379,7 @@ u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, size_t
     U8Node *node = NULL;
     
     u8 *file_data = NULL;
-    size_t file_size = 0;
+    u64 file_size = 0;
     
     /* Initialize U8 context. */
     if (!u8ContextInit(u8_fd, &u8_ctx))
@@ -414,7 +414,7 @@ out:
 
 static U8Node *u8GetChildNodeByName(U8Context *ctx, U8Node *dir_node, u32 *node_idx, const char *name, u8 type)
 {
-    size_t name_len = 0;
+    u64 name_len = 0;
     
     if (!ctx || !ctx->nodes || !ctx->str_table || !dir_node || dir_node->properties.type != U8NodeType_Directory || !node_idx || *node_idx >= ctx->node_count || (*node_idx + 1) >= dir_node->size || \
         !name || !(name_len = strlen(name)) || (type != U8NodeType_File && type != U8NodeType_Directory)) return NULL;

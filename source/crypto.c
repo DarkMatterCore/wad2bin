@@ -69,7 +69,7 @@ void cryptoAes128CbcContextResetIv(CryptoAes128CbcContext *ctx, const void *iv)
     memcpy(ctx->iv, iv, AES_BLOCK_SIZE);
 }
 
-bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, size_t size, bool encrypt)
+bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const void *src, u64 size, bool encrypt)
 {
     if (!ctx || !dst || !src || (size % AES_BLOCK_SIZE) != 0)
     {
@@ -86,7 +86,7 @@ bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const v
     return (ret == 0);
 }
 
-bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, size_t size, bool encrypt)
+bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, u64 size, bool encrypt)
 {
     if (!key || !iv || !dst || !src || (size % AES_BLOCK_SIZE) != 0)
     {
@@ -119,7 +119,7 @@ out:
     return success;
 }
 
-void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, size_t size, bool padded_sig)
+void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, u64 size, bool padded_sig)
 {
     if (!private_key || !dst || !src || !size) return;
     

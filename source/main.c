@@ -34,13 +34,13 @@ int main(int argc, char **argv)
     u64 parent_tid = 0;
     
     u8 *cert_chain = NULL;
-    size_t cert_chain_size = 0;
+    u64 cert_chain_size = 0;
     
     u8 *ticket = NULL;
-    size_t ticket_size = 0;
+    u64 ticket_size = 0;
     
     u8 *tmd = NULL;
-    size_t tmd_size = 0, aligned_tmd_size = 0;
+    u64 tmd_size = 0, aligned_tmd_size = 0;
     
     u32 tid_upper = 0;
     
@@ -95,7 +95,7 @@ int main(int argc, char **argv)
             
             /* Check if the output directory string ends with a path separator. */
             /* If so, remove it. */
-            size_t path_len = strlen(argv[i + 1]);
+            u64 path_len = strlen(argv[i + 1]);
             if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
         }
     }

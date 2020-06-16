@@ -229,7 +229,7 @@ CertSigEcc480PubKeyEcc480 *keysGetDeviceCertificate(void)
 bool keysParseHexKey(u8 *out, const char *key, const char *value, u32 size, bool verbose)
 {
     u32 hex_str_len = (2 * size);
-    size_t value_len = 0;
+    u64 value_len = 0;
     
     if (!out || (verbose && (!key || !strlen(key))) || !value || !(value_len = strlen(value)) || !size)
     {

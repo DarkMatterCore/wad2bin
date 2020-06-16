@@ -84,9 +84,9 @@ typedef struct {
 } BinContentCertArea;
 
 /// Generates a content.bin file using an unpacked WAD data directory and TMD data loaded into memory.
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size);
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size);
 
 /// Generates <index>.bin file(s) using an unpacked WAD data directory, TMD data loaded into memory and a parent title ID.
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, size_t tmd_size, u64 parent_tid);
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid);
 
 #endif /* __BIN_H__ */

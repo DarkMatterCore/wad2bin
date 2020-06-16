@@ -22,9 +22,9 @@
 #include "utils.h"
 #include "tmd.h"
 
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose);
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose);
 
-u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
+u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size)
 {
     if (!fd || tmd_size < TMD_MIN_SIZE)
     {
@@ -33,10 +33,10 @@ u8 *tmdReadTitleMetadataFromFile(FILE *fd, size_t tmd_size)
     }
     
     u8 *tmd = NULL;
-    size_t res = 0;
+    u64 res = 0;
     
     u8 tmd_type = 0;
-    size_t tmd_detected_size = 0;
+    u64 tmd_detected_size = 0;
     
     bool success = false;
     
@@ -77,7 +77,7 @@ out:
     return tmd;
 }
 
-TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, size_t buf_size, u8 *out_tmd_type)
+TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_tmd_type)
 {
     if (!buf || buf_size < TMD_MIN_SIZE)
     {
@@ -139,7 +139,7 @@ bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block)
     return true;
 }
 
-void tmdFakesignTitleMetadata(void *buf, size_t buf_size)
+void tmdFakesignTitleMetadata(void *buf, u64 buf_size)
 {
     if (!buf || buf_size < TMD_MIN_SIZE) return;
     
@@ -183,7 +183,7 @@ void tmdFakesignTitleMetadata(void *buf, size_t buf_size)
     /* Modify TMD until we get a hash that starts with 0x00. */
     u8 hash[SHA1_HASH_SIZE] = {0};
     u16 *padding = (u16*)tmd_common_block->reserved_4;
-    size_t tmd_size = TMD_COMMON_BLOCK_SIZE(tmd_common_block);
+    u64 tmd_size = TMD_COMMON_BLOCK_SIZE(tmd_common_block);
     
     for(u16 i = 0; i < 65535; i++)
     {
@@ -193,7 +193,7 @@ void tmdFakesignTitleMetadata(void *buf, size_t buf_size)
     }
 }
 
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_type, size_t *out_size, bool verbose)
+bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose)
 {
     if (!buf || buf_size < TMD_MIN_SIZE || (!out_type && !out_size))
     {
@@ -202,7 +202,7 @@ bool tmdGetTitleMetadataTypeAndSize(const void *buf, size_t buf_size, u8 *out_ty
     }
     
     u32 sig_type = 0;
-    size_t offset = 0;
+    u64 offset = 0;
     u8 type = TmdType_None;
     const u8 *buf_u8 = (const u8*)buf;
     const TmdCommonBlock *tmd_common_block = NULL;
