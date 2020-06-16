@@ -29,7 +29,7 @@
 static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, u64 cnt_size, const u8 *cnt_hash, const os_char_t *out_path, u64 *out_aligned_cnt_size);
 
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, u64 *out_cert_chain_size, u8 **out_tik, u64 *out_tik_size, u8 **out_tmd, \
-                                 u64 *out_tmd_size, u8 *out_dec_titlekey, u32 *out_tid_upper)
+                                 u64 *out_tmd_size, u32 *out_tid_upper)
 {
     size_t out_path_len = 0;
     
@@ -348,8 +348,6 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         *out_tmd_size = wad_header.tmd_size;
     }
     
-    if (out_dec_titlekey) memcpy(out_dec_titlekey, dec_titlekey, AES_BLOCK_SIZE);
-    
     if (out_tid_upper) *out_tid_upper = tid_upper;
     
     success = true;
@@ -473,6 +471,102 @@ out:
     if (aes_ctx_init) cryptoAes128CbcContextFree(&aes_ctx);
     
     if (buf) free(buf);
+    
+    return success;
+}
+
+bool wadGenerateBogusInstallablePackage(os_char_t *out_path, u8 *cert_chain, u64 cert_chain_size, u8 *ticket, u64 ticket_size, u8 *tmd, u64 tmd_size)
+{
+    size_t out_path_len = 0;
+    
+    if (!out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || cert_chain_size < CERT_MIN_SIZE || !ticket || ticket_size < TIK_MIN_SIZE || !tmd || tmd_size < TMD_MIN_SIZE)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    TmdCommonBlock *tmd_common_block = NULL;
+    
+    FILE *wad_fd = NULL;
+    WadInstallablePackageHeader wad_header = {0};
+    
+    u64 res = 0, title_id = 0;
+    u64 aligned_cert_chain_size = ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE);
+    u64 aligned_ticket_size = ALIGN_UP(ticket_size, WAD_BLOCK_SIZE);
+    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
+    
+    bool success = false;
+    
+    /* Retrieve title ID from TMD common block. */
+    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
+    title_id = bswap_64(tmd_common_block->title_id);
+    
+    /* Generate output path. */
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%016" PRIx64 "_bogus.wad", title_id);
+    
+    /* Open output file. */
+    wad_fd = os_fopen(out_path, OS_MODE_WRITE);
+    if (!wad_fd)
+    {
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        goto out;
+    }
+    
+    /* Prepare installable WAD header. */
+    wad_header.header_size = (u32)WadHeaderSize_InstallablePackage;
+    wad_header.type = (u16)WadType_NormalPackage;
+    wad_header.version = (u16)WadVersion_InstallablePackage;
+    wad_header.cert_chain_size = (u32)cert_chain_size;
+    wad_header.ticket_size = (u32)ticket_size;
+    wad_header.tmd_size = (u32)tmd_size;
+    
+    /* Byteswap installable WAD header fields. */
+    wadByteswapInstallablePackageHeaderFields(&wad_header);
+    
+    /* Write installable WAD header. */
+    res = fwrite(&wad_header, 1, sizeof(WadInstallablePackageHeader), wad_fd);
+    if (res != sizeof(WadInstallablePackageHeader))
+    {
+        ERROR_MSG("Failed to write installable WAD header to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Write certificate chain. */
+    res = fwrite(cert_chain, 1, aligned_cert_chain_size, wad_fd);
+    if (res != aligned_cert_chain_size)
+    {
+        ERROR_MSG("Failed to write certificate chain to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Write ticket. */
+    res = fwrite(ticket, 1, aligned_ticket_size, wad_fd);
+    if (res != aligned_ticket_size)
+    {
+        ERROR_MSG("Failed to write ticket to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    /* Write TMD. */
+    res = fwrite(tmd, 1, aligned_tmd_size, wad_fd);
+    if (res != aligned_tmd_size)
+    {
+        ERROR_MSG("Failed to write TMD to \"" OS_PRINT_STR "\"!", out_path);
+        goto out;
+    }
+    
+    printf("Successfully saved bogus WAD package to \"" OS_PRINT_STR "\".\n\n", out_path);
+    
+    success = true;
+    
+out:
+    if (wad_fd)
+    {
+        fclose(wad_fd);
+        if (!success) os_remove(out_path);
+    }
+    
+    out_path[out_path_len] = (os_char_t)0;
     
     return success;
 }

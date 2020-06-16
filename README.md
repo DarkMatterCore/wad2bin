@@ -2,15 +2,6 @@
 
 Converts installable Wii WAD packages to backup WAD packages (*.bin files) using console-specific keydata. These files can be stored on a SD card and used to launch channels via System Menu 4.0+, or used with games that save/read data in this format.
 
-Guidelines:
---------------
-
-* Console-specific data is required to perform the conversion. Dump it from the target console using [xyzzy-mod](https://github.com/DarkMatterCore/xyzzy-mod).
-    * The program expects two different files with console specific data: a text file with keydata (check `keys.txt.template` for actual format) and `device.cert`.
-* Both ticket + TMD for each converted WAD package must be installed on the target Wii console in order for this to work.
-    * A homebrew-based solution to install both ticket and TMD after the WAD package has been converted is being looked into.
-* If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
-
 Usage:
 --------------
 
@@ -22,6 +13,16 @@ The required directory tree for the *.bin file(s) will be created at the output 
 You can set your SD card root directory as the output directory.
 Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
 ```
+
+Guidelines:
+--------------
+
+* Console-specific data is required to perform the conversion. Dump it from the target console using [xyzzy-mod](https://github.com/DarkMatterCore/xyzzy-mod).
+    * The program expects two different files with console specific data: a text file with keydata (check `keys.txt.template` for actual format) and `device.cert`.
+* Both ticket and TMD for each converted WAD package must be installed on the target Wii console in order for this to work.
+    * For this matter, the program generates a bogus WAD package at the provided output directory. It can be used with regular WAD Managers to install both ticket and TMD if needed.
+* If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
+* If a DLC WAD is provided, it doesn't matter if it's an uncomplete WAD with missing contents, a WAD with a tampered TMD that only references the packaged contents or a full WAD with all contents: all cases are supported by wad2bin. There's no need to provide any content indexes.
 
 Differences between `content.bin` files and `<index>.bin` files:
 --------------
@@ -51,6 +52,12 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 
 Changelog:
 --------------
+
+**v0.5:**
+
+Implemented bogus installable WAD package generation (header + certificate chain + ticket + TMD), saved at the provided output directory using the `<title_id>_bogus.wad` naming convention.
+
+These bogus WAD packages can be used to install both ticket and TMD if needed, using regular WAD Managers. Errors such as -1022 can be safely ignored (e.g. content data isn't available in these WADs).
 
 **v0.4:**
 

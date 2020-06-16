@@ -34,17 +34,15 @@ int main(int argc, char **argv)
     u64 parent_tid = 0;
     
     u8 *cert_chain = NULL;
-    u64 cert_chain_size = 0;
+    u64 cert_chain_size = 0, aligned_cert_chain_size = 0;
     
     u8 *ticket = NULL;
-    u64 ticket_size = 0;
+    u64 ticket_size = 0, aligned_ticket_size = 0;
     
     u8 *tmd = NULL;
     u64 tmd_size = 0, aligned_tmd_size = 0;
     
     u32 tid_upper = 0;
-    
-    u8 dec_titlekey[AES_BLOCK_SIZE] = {0};
     
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
@@ -134,7 +132,7 @@ int main(int argc, char **argv)
     printf("Keydata and device certificate successfully loaded.\n\n");
     
     /* Unpack input WAD package. */
-    if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, dec_titlekey, &tid_upper))
+    if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, &tid_upper))
     {
         ret = -7;
         goto out;
@@ -142,13 +140,33 @@ int main(int argc, char **argv)
     
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
     
+    /* Reallocate certificate chain buffer (if necessary). */
+    /* We need to do this if the certificate chain size isn't aligned to the WAD block size. */
+    aligned_cert_chain_size = cert_chain_size;
+    if (!utilsAlignBuffer((void**)&cert_chain, &aligned_cert_chain_size, WAD_BLOCK_SIZE))
+    {
+        printf("Failed to align certificate chain buffer to WAD block size!\n");
+        ret = -8;
+        goto out;
+    }
+    
+    /* Reallocate ticket buffer (if necessary). */
+    /* We need to do this if the ticket size isn't aligned to the WAD block size. */
+    aligned_ticket_size = ticket_size;
+    if (!utilsAlignBuffer((void**)&ticket, &aligned_ticket_size, WAD_BLOCK_SIZE))
+    {
+        printf("Failed to align ticket buffer to WAD block size!\n");
+        ret = -9;
+        goto out;
+    }
+    
     /* Reallocate TMD buffer (if necessary). */
     /* We need to do this if the TMD size isn't aligned to the WAD block size. */
     aligned_tmd_size = tmd_size;
     if (!utilsAlignBuffer((void**)&tmd, &aligned_tmd_size, WAD_BLOCK_SIZE))
     {
         printf("Failed to align TMD buffer to WAD block size!\n");
-        ret = -8;
+        ret = -10;
         goto out;
     }
     
@@ -158,34 +176,37 @@ int main(int argc, char **argv)
         if (argc != (ARG_COUNT + 2))
         {
             printf("Error: parent title ID not provided! This is required for DLC titles.\n");
-            ret = -9;
+            ret = -11;
             goto out;
         }
         
         /* Generate <index>.bin file(s). */
         if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size, parent_tid))
         {
-            ret = -10;
+            ret = -12;
             goto out;
         }
     } else {
         /* Generate content.bin file. */
         if (!binGenerateContentBinFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
         {
-            ret = -11;
+            ret = -13;
             goto out;
         }
     }
     
+    /* Generate bogus installable WAD package. */
+    if (!wadGenerateBogusInstallablePackage(paths[3], cert_chain, cert_chain_size, ticket, ticket_size, tmd, tmd_size))
+    {
+        ret = -14;
+        goto out;
+    }
+    
     printf("Process finished!\n\n");
     
-    
-    
-    
-    
-    
-    
 out:
+    if (ret < 0 && ret != -1) printf("Process failed!\n\n");
+    
     if (tmd) free(tmd);
     
     if (ticket) free(ticket);
