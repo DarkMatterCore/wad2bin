@@ -269,6 +269,9 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     
     for(u16 i = 0; i < content_count && wad_offset < calc_wad_size; i++)
     {
+        size_t aligned_cnt_size = 0;
+        bool unpack_res = false;
+        
         /* Generate content IV. */
         memset(cnt_iv, 0, AES_BLOCK_SIZE);
         memcpy(cnt_iv, &(tmd_contents[i].index), sizeof(u16));
@@ -286,36 +289,42 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         /* Generate output path for the current content. */
         os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%08" PRIx16 ".app", tmd_contents[i].index);
         
-        /* Unpack content. */
-        size_t aligned_cnt_size = 0;
-        if (!wadUnpackContentFromInstallablePackage(wad_fd, dec_titlekey, cnt_iv, tmd_contents[i].size, tmd_contents[i].hash, out_path, &aligned_cnt_size))
+        /* Skip content if we're dealing with a DLC and the size of the rest of the WAD package is smaller than the content itself. */
+        if (tid_upper == TITLE_TYPE_DLC && (calc_wad_size - wad_offset) < tmd_contents[i].size)
         {
-            os_remove(out_path);
-            
-            if (tid_upper == TITLE_TYPE_DLC && i < (content_count - 1))
+            printf("Content with index %04" PRIx16 " is bigger than the rest of the WAD package (doesn't match data at offset 0x%zx). Skipping...\n\n", tmd_contents[i].index, wad_offset);
+        } else {
+            /* Unpack content. */
+            unpack_res = wadUnpackContentFromInstallablePackage(wad_fd, dec_titlekey, cnt_iv, tmd_contents[i].size, tmd_contents[i].hash, out_path, &aligned_cnt_size);
+            if (!unpack_res)
             {
-                printf("Data at WAD offset 0x%zx doesn't match content index %04" PRIx16 ".\n\n", wad_offset, tmd_contents[i].index);
+                os_remove(out_path);
                 
-                /* Seek back to the start of the current content file. We'll retry again with the next content record. */
-                os_fseek(wad_fd, wad_offset, SEEK_SET);
+                if (tid_upper == TITLE_TYPE_DLC && i < (content_count - 1))
+                {
+                    printf("Data at WAD offset 0x%zx doesn't match content with index %04" PRIx16 ".\n\n", wad_offset, tmd_contents[i].index);
+                    
+                    /* Seek back to the start of the current content file. We'll retry again with the next content record. */
+                    os_fseek(wad_fd, wad_offset, SEEK_SET);
+                } else {
+                    ERROR_MSG("Failed to save decrypted content file \"%08" PRIx16 ".app\" from \"" OS_PRINT_STR "\"!", tmd_contents[i].index, wad_path);
+                    goto out;
+                }
             } else {
-                ERROR_MSG("Failed to save decrypted content file \"%08" PRIx16 ".app\" from \"" OS_PRINT_STR "\"!", tmd_contents[i].index, wad_path);
-                goto out;
+                /* Update WAD offset. */
+                wad_offset += aligned_cnt_size;
+                
+                /* Print unpacked content info. */
+                printf("  TMD content #%u:\n", i + 1);
+                printf("    Content ID:           %08" PRIx32 ".\n", tmd_contents[i].content_id);
+                printf("    Content index:        %04" PRIx16 ".\n", tmd_contents[i].index);
+                printf("    Content type:         %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
+                printf("    Content size:         0x%" PRIx64 ".\n", tmd_contents[i].size);
+                utilsPrintHexData("    Content SHA-1 hash:   ", tmd_contents[i].hash, SHA1_HASH_SIZE);
+                utilsPrintHexData("    Content IV:           ", cnt_iv, AES_BLOCK_SIZE);
+                printf("\n");
             }
         }
-        
-        /* Update WAD offset. */
-        wad_offset += aligned_cnt_size;
-        
-        /* Print unpacked content info. */
-        printf("  TMD content #%u:\n", i + 1);
-        printf("    Content ID:           %08" PRIx32 ".\n", tmd_contents[i].content_id);
-        printf("    Content index:        %04" PRIx16 ".\n", tmd_contents[i].index);
-        printf("    Content type:         %04" PRIx16 " (%s).\n", tmd_contents[i].type, TMD_CONTENT_REC_TYPE_STR(tmd_contents[i].type));
-        printf("    Content size:         0x%" PRIx64 ".\n", tmd_contents[i].size);
-        utilsPrintHexData("    Content SHA-1 hash:   ", tmd_contents[i].hash, SHA1_HASH_SIZE);
-        utilsPrintHexData("    Content IV:           ", cnt_iv, AES_BLOCK_SIZE);
-        printf("\n");
         
         /* Restore byteswapped content record fields. */
         tmdByteswapTitleMetadataContentRecordFields(&(tmd_contents[i]));

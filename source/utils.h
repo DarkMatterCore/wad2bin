@@ -27,7 +27,7 @@
 #include "types.h"
 #include "os.h"
 
-#define VERSION                         "0.3"
+#define VERSION                         "0.4"
 
 /* Supress clang warnings about variadic macro arguments. */
 #ifdef __clang__

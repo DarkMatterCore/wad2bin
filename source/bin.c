@@ -397,7 +397,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         goto out;
     }
     
-    printf("Successfully saved converted WAD package to \"" OS_PRINT_STR "\".\n", out_path);
+    printf("Successfully saved converted WAD package to \"" OS_PRINT_STR "\".\n\n", out_path);
     
     success = true;
     

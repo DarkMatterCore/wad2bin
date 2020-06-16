@@ -177,7 +177,7 @@ int main(int argc, char **argv)
         }
     }
     
-    
+    printf("Process finished!\n");
     
     
     
