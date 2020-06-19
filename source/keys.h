@@ -42,4 +42,7 @@ u8 *keysGetPrngKey(void);
 u8 *keysGetEccPrivateKey(void);
 CertSigEcc480PubKeyEcc480 *keysGetDeviceCertificate(void);
 
+/// Parses binary data from a hex string.
+bool keysParseHexKey(u8 *out, const char *key, const char *value, u32 size, bool verbose);
+
 #endif /* __KEYS_H__ */

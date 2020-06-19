@@ -26,7 +26,6 @@
 
 #include "tmd.h"
 
-#define WAD_BLOCK_SIZE          0x40
 #define WAD_HEADER_SIZE_STR(x)  ((x) == WadHeaderSize_InstallablePackage ? "InstallablePackage" : ((x) == WadHeaderSize_BackupPackage ? "BackupPackage" : "Unknown"))
 #define WAD_TYPE_STR(x)         ((x) == WadType_NormalPackage ? "Normal" : ((x) == WadType_Boot2Package ? "Boot2" : ((x) == WadType_BackupPackage ? "Backup" : "Unknown")))
 #define WAD_VERSION_STR(x)      ((x) == WadVersion_InstallablePackage ? "InstallablePackage" : ((x) == WadVersion_BackupPackage ? "BackupPackage" : "Unknown"))

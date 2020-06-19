@@ -30,61 +30,54 @@
 #define REF_TID_1               (u64)0x0001000157424D45 /* 10001-WBME. Used by BannerBomb. */
 #define REF_TID_2               (u64)0x000100014E414A4E /* 10001-NAJN. Used by BannerBomb. */
 
-typedef struct {
-    u32 dlc_tid_mask;
-    u32 parent_tid_mask;
-} DlcEntry;
-
-/* Table with title IDs from DLCs that support the <index>.bin format. */
-/* Although DLCs not displayed here can be converted, their parent titles don't support this format, so they're excluded. */
+/* Array with lower TID masks from DLCs that support the <index>.bin format (region byte set to zero). */
+/* Although DLCs not displayed here *can* be converted, their parent titles don't support this format, so they're excluded. */
 /* These are all disc-based games. */
-static const DlcEntry g_indexedDlcTable[] = {
-    /* Rock Band 2. */
-    { 0x735A4100, 0x535A4100 }, /* "sZA" -> "SZA" (DLC1). */
-    { 0x735A4200, 0x535A4100 }, /* "sZB" -> "SZA" (DLC2). */
-    { 0x735A4300, 0x535A4100 }, /* "sZC" -> "SZA" (DLC3). */
-    { 0x735A4400, 0x535A4100 }, /* "sZD" -> "SZA" (DLC4). */
-    { 0x735A4500, 0x535A4100 }, /* "sZE" -> "SZA" (DLC5). */
-    { 0x735A4600, 0x535A4100 }, /* "sZF" -> "SZA" (DLC6). */
+static const u32 g_supportedDLCs[] = {
+    /* Rock Band 2 ("SZAx"). */
+    0x735A4100, /* "sZA" (DLC1). */
+    0x735A4200, /* "sZB" (DLC2). */
+    0x735A4300, /* "sZC" (DLC3). */
+    0x735A4400, /* "sZD" (DLC4). */
+    0x735A4500, /* "sZE" (DLC5). */
+    0x735A4600, /* "sZF" (DLC6). */
     
-    /* Rock Band 3. */
-    { 0x735A4A00, 0x535A4200 }, /* "sZJ" -> "SZB" (DLC1). */
-    { 0x735A4B00, 0x535A4200 }, /* "sZK" -> "SZB" (DLC2). */
-    { 0x735A4C00, 0x535A4200 }, /* "sZL" -> "SZB" (DLC3). */
-    { 0x735A4D00, 0x535A4200 }, /* "sZM" -> "SZB" (DLC4). */
+    /* Rock Band 3 ("SZBx"). */
+    0x735A4A00, /* "sZJ" (DLC1). */
+    0x735A4B00, /* "sZK" (DLC2). */
+    0x735A4C00, /* "sZL" (DLC3). */
+    0x735A4D00, /* "sZM" (DLC4). */
     
-    /* Guitar Hero: World Tour. */
-    { 0x73584100, 0x53584100 }, /* "sXA" -> "SXA" (DLC1). */
-    { 0x73594F00, 0x53584100 }, /* "sYO" -> "SXA" (DLC2). */
+    /* Guitar Hero: World Tour ("SXAx"). */
+    0x73584100, /* "sXA" (DLC1). */
+    0x73594F00, /* "sYO" (DLC2). */
     
-    /* Guitar Hero 5. */
-    { 0x73584500, 0x53584500 }, /* "sXE" -> "SXE" (DLC1). */
-    { 0x73584600, 0x53584500 }, /* "sXF" -> "SXE" (DLC2). */
-    { 0x73584700, 0x53584500 }, /* "sXG" -> "SXE" (DLC3). */
-    { 0x73584800, 0x53584500 }, /* "sXH" -> "SXE" (DLC4) (not sure about this one, it's very small). */
+    /* Guitar Hero 5 ("SXEx"). */
+    0x73584500, /* "sXE" (DLC1). */
+    0x73584600, /* "sXF" (DLC2). */
+    0x73584700, /* "sXG" (DLC3). */
+    0x73584800, /* "sXH" (DLC4). */
     
-    /* Guitar Hero: Warriors of Rock. */
-    { 0x73584900, 0x53584900 }, /* "sXI" -> "SXI". */
+    /* Guitar Hero: Warriors of Rock ("SXIx"). */
+    0x73584900, /* "sXI". */
     
-    /* Just Dance 2. */
-    { 0x73443200, 0x53443200 }, /* "sD2" -> "SD2". */
+    /* Just Dance 2 ("SD2x"). */
+    0x73443200, /* "sD2". */
     
-    /* Just Dance 3. */
-    { 0x734A4400, 0x534A4400 }, /* "sJD" -> "SJD". */
+    /* Just Dance 3 ("SJDx"). */
+    0x734A4400, /* "sJD". */
     
-    /* Just Dance 4. */
-    { 0x734A5800, 0x534A5800 }, /* "sJX" -> "SJX". */
+    /* Just Dance 4 ("SJXx"). */
+    0x734A5800, /* "sJX". */
     
-    /* Just Dance 2014. */
-    { 0x734A4F00, 0x534A4F00 }, /* "sJO" -> "SJO". */
+    /* Just Dance 2014 ("SJOx"). */
+    0x734A4F00, /* "sJO". */
     
-    /* Just Dance 2015. */
-    { 0x73453300, 0x53453300 }  /* "sE3" -> "SE3". */
+    /* Just Dance 2015 ("SE3x"). */
+    0x73453300  /* "sE3". */
 };
 
-static const u32 g_indexedDlcTableSize = MAX_ELEMENTS(g_indexedDlcTable);
-
-static bool binGenerateDlcParentId(u64 dlc_tid, u64 *out_parent_tid);
+static const u32 g_supportedDLCsCount = MAX_ELEMENTS(g_supportedDLCs);
 
 bool binIsDlcTitleConvertible(u64 tid)
 {
@@ -96,9 +89,9 @@ bool binIsDlcTitleConvertible(u64 tid)
     
     u32 tid_lower_mask = (TITLE_LOWER(tid) & 0xFFFFFF00);
     
-    for(u32 i = 0; i < g_indexedDlcTableSize; i++)
+    for(u32 i = 0; i < g_supportedDLCsCount; i++)
     {
-        if (tid_lower_mask == g_indexedDlcTable[i].dlc_tid_mask) return true;
+        if (tid_lower_mask == g_supportedDLCs[i]) return true;
     }
     
     return false;
@@ -498,7 +491,7 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
@@ -518,8 +511,9 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     
     u32 console_id = 0;
     u8 *prng_key = NULL;
+    u8 null_key[AES_BLOCK_SIZE] = {0};
     
-    u64 title_id = 0, parent_tid = 0;
+    u64 title_id = 0;
     char tid_lower_ascii[5] = {0};
     
     WadBackupPackageHeader bk_header = {0};
@@ -539,13 +533,6 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     /* Convert the Title ID lower u32 to ASCII. */
     title_id = bswap_64(tmd_common_block->title_id);
     utilsGenerateAsciiStringFromTitleIdLower(title_id, tid_lower_ascii);
-    
-    /* Generate parent title ID. */
-    if (!binGenerateDlcParentId(title_id, &parent_tid))
-    {
-        ERROR_MSG("Failed to generate parent title ID for DLC!");
-        return false;
-    }
     
     /* Create directory tree. */
     os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, PRIVATE_PATH("data"), tid_lower_ascii);
@@ -636,7 +623,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         }
         
         /* Write encrypted content file. */
-        write_res = wadWriteUnpackedContentToPackage(indexed_bin, prng_key, cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
+        write_res = wadWriteUnpackedContentToPackage(indexed_bin, null_key, cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
         if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
         
         /* Close files. */
@@ -663,28 +650,4 @@ out:
     unpacked_wad_path[unpacked_wad_path_len] = (os_char_t)0;
     
     return success;
-}
-
-static bool binGenerateDlcParentId(u64 dlc_tid, u64 *out_parent_tid)
-{
-    if (TITLE_UPPER(dlc_tid) != TITLE_TYPE_DLC || !out_parent_tid)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    u32 dlc_lower_tid = TITLE_LOWER(dlc_tid);
-    u32 dlc_tid_mask = (dlc_lower_tid & 0xFFFFFF00);
-    
-    for(u32 i = 0; i < g_indexedDlcTableSize; i++)
-    {
-        if (dlc_tid_mask == g_indexedDlcTable[i].dlc_tid_mask)
-        {
-            /* Copy region code from the DLC title ID. */
-            *out_parent_tid = TITLE_ID(TITLE_TYPE_DISC_GAME, g_indexedDlcTable[i].parent_tid_mask | (dlc_lower_tid & 0xFF));
-            return true;
-        }
-    }
-    
-    return false;
 }

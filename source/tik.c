@@ -42,7 +42,7 @@ u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size)
     bool success = false;
     
     /* Allocate memory for the ticket. */
-    ticket = malloc(ticket_size);
+    ticket = calloc(ALIGN_UP(ticket_size, WAD_BLOCK_SIZE), sizeof(u8));
     if (!ticket)
     {
         ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes ticket buffer!", ticket_size);

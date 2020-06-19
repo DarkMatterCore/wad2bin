@@ -138,7 +138,6 @@ static bool g_keyDataLoaded = false, g_deviceCertRetrieved = false;
 
 static int keysGetKeyAndValueFromFile(FILE *f, char **key, char **value);
 static char keysConvertHexCharToBinary(char c);
-static bool keysParseHexKey(u8 *out, const char *key, const char *value, u32 size);
 static bool keysReadKeysFromFile(const os_char_t *keys_file_path);
 
 static bool keysReadDeviceCertificateFromFile(const os_char_t *device_cert_path);
@@ -225,6 +224,41 @@ u8 *keysGetEccPrivateKey(void)
 CertSigEcc480PubKeyEcc480 *keysGetDeviceCertificate(void)
 {
     return (g_deviceCertRetrieved ? &g_deviceCert : NULL);
+}
+
+bool keysParseHexKey(u8 *out, const char *key, const char *value, u32 size, bool verbose)
+{
+    u32 hex_str_len = (2 * size);
+    u64 value_len = 0;
+    
+    if (!out || (verbose && (!key || !strlen(key))) || !value || !(value_len = strlen(value)) || !size)
+    {
+        ERROR_MSG("Invalid parameters!");
+        return false;
+    }
+    
+    if (value_len != hex_str_len)
+    {
+        if (verbose) ERROR_MSG("Key \"%s\" must be %u hex digits long!", key, hex_str_len);
+        return false;
+    }
+    
+    memset(out, 0, size);
+    
+    for(u32 i = 0; i < hex_str_len; i++)
+    {
+        char val = keysConvertHexCharToBinary(value[i]);
+        if (val == 'z')
+        {
+            if (verbose) ERROR_MSG("Invalid hex character in key \"%s\" at position %u!", key, i);
+            return false;
+        }
+        
+        if ((i & 1) == 0) val <<= 4;
+        out[i >> 1] |= val;
+    }
+    
+    return true;
 }
 
 /**
@@ -373,41 +407,6 @@ static char keysConvertHexCharToBinary(char c)
     return 'z';
 }
 
-static bool keysParseHexKey(u8 *out, const char *key, const char *value, u32 size)
-{
-    u32 hex_str_len = (2 * size);
-    u64 value_len = 0;
-    
-    if (!out || !key || !strlen(key) || !value || !(value_len = strlen(value)) || !size)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    if (value_len != hex_str_len)
-    {
-        ERROR_MSG("Key \"%s\" must be %u hex digits long!", key, hex_str_len);
-        return false;
-    }
-    
-    memset(out, 0, size);
-    
-    for(u32 i = 0; i < hex_str_len; i++)
-    {
-        char val = keysConvertHexCharToBinary(value[i]);
-        if (val == 'z')
-        {
-            ERROR_MSG("Invalid hex character in key \"%s\" at position %u!", key, i);
-            return false;
-        }
-        
-        if ((i & 1) == 0) val <<= 4;
-        out[i >> 1] |= val;
-    }
-    
-    return true;
-}
-
 static bool keysReadKeysFromFile(const os_char_t *keys_file_path)
 {
     if (!keys_file_path || !os_strlen(keys_file_path))
@@ -443,7 +442,7 @@ static bool keysReadKeysFromFile(const os_char_t *keys_file_path)
             if (g_keyData[i].retrieved || strlen(key) != strlen(g_keyData[i].name) || strcmp(key, g_keyData[i].name) != 0) continue;
             
             /* Parse current key. */
-            if ((parse_fail = !keysParseHexKey(g_keyData[i].key, key, value, g_keyData[i].key_size)))
+            if ((parse_fail = !keysParseHexKey(g_keyData[i].key, key, value, g_keyData[i].key_size, true)))
             {
                 /* Reset flag if we're not dealing with a mandatory key. */
                 if (!g_keyData[i].mandatory) parse_fail = false;

@@ -42,7 +42,7 @@ u8 *certReadRawCertificateChainFromFile(FILE *fd, u64 cert_chain_size)
     bool success = false;
     
     /* Allocate memory for the raw certificate chain. */
-    raw_chain = malloc(cert_chain_size);
+    raw_chain = calloc(ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE), sizeof(u8));
     if (!raw_chain)
     {
         ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes raw certificate chain buffer!", cert_chain_size);

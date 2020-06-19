@@ -33,26 +33,28 @@ int main(int argc, char **argv)
     os_char_t *paths[ARG_COUNT + 1] = {0};
     
     u8 *cert_chain = NULL;
-    u64 cert_chain_size = 0, aligned_cert_chain_size = 0;
+    u64 cert_chain_size = 0;
     
     u8 *ticket = NULL;
-    u64 ticket_size = 0, aligned_ticket_size = 0;
+    u64 ticket_size = 0;
     
     u8 *tmd = NULL;
-    u64 tmd_size = 0, aligned_tmd_size = 0;
+    u64 tmd_size = 0;
     
-    u64 title_id = 0;
+    u64 title_id = 0, parent_tid = 0;
     u32 tid_upper = 0;
     
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
-    if (argc != (ARG_COUNT + 1) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH)
+    if (argc < (ARG_COUNT + 1) || argc > (ARG_COUNT + 2) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || \
+        (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH || (argc == (ARG_COUNT + 2) && strlen(argv[5]) != 16))
     {
-        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir>\n\n", argv[0]);
+        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
         printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
-        printf("You can set your SD card root directory as the output directory.\n\n");
+        printf("You can set your SD card root directory as the output directory.\n");
+        printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n\n");
         ret = -1;
         goto out;
     }
@@ -96,10 +98,34 @@ int main(int argc, char **argv)
         }
     }
     
+    /* Check if the user provided a parent title ID. */
+    if (argc == (ARG_COUNT + 2))
+    {
+        /* Parse parent title ID. */
+        if (!keysParseHexKey((u8*)&parent_tid, NULL, argv[5], 8, false))
+        {
+            printf("Failed to parse parent title ID!\n");
+            ret = -4;
+            goto out;
+        }
+        
+        /* Byteswap parent title ID. */
+        parent_tid = bswap_64(parent_tid);
+        
+        /* Check if the TID upper u32 is valid. */
+        u32 parent_tid_upper = TITLE_UPPER(parent_tid);
+        if (parent_tid_upper != TITLE_TYPE_DISC_GAME && parent_tid_upper != TITLE_TYPE_DOWNLOADABLE_CHANNEL && parent_tid_upper != TITLE_TYPE_DISC_BASED_CHANNEL)
+        {
+            printf("Invalid parent title ID category!\nOnly disc-based game IDs, downloadable channel IDs and disc-based channel IDs are supported.\n");
+            ret = -5;
+            goto out;
+        }
+    }
+    
     /* Load keydata and device certificate. */
     if (!keysLoadKeyDataAndDeviceCert(paths[0], paths[1]))
     {
-        ret = -4;
+        ret = -6;
         goto out;
     }
     
@@ -108,46 +134,24 @@ int main(int argc, char **argv)
     /* Unpack input WAD package. */
     if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, &title_id))
     {
-        ret = -5;
+        ret = -7;
         goto out;
     }
     
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
     
-    /* Reallocate certificate chain buffer (if necessary). */
-    /* We need to do this if the certificate chain size isn't aligned to the WAD block size. */
-    aligned_cert_chain_size = cert_chain_size;
-    if (!utilsAlignBuffer((void**)&cert_chain, &aligned_cert_chain_size, WAD_BLOCK_SIZE))
-    {
-        printf("Failed to align certificate chain buffer to WAD block size!\n");
-        ret = -6;
-        goto out;
-    }
-    
-    /* Reallocate ticket buffer (if necessary). */
-    /* We need to do this if the ticket size isn't aligned to the WAD block size. */
-    aligned_ticket_size = ticket_size;
-    if (!utilsAlignBuffer((void**)&ticket, &aligned_ticket_size, WAD_BLOCK_SIZE))
-    {
-        printf("Failed to align ticket buffer to WAD block size!\n");
-        ret = -7;
-        goto out;
-    }
-    
-    /* Reallocate TMD buffer (if necessary). */
-    /* We need to do this if the TMD size isn't aligned to the WAD block size. */
-    aligned_tmd_size = tmd_size;
-    if (!utilsAlignBuffer((void**)&tmd, &aligned_tmd_size, WAD_BLOCK_SIZE))
-    {
-        printf("Failed to align TMD buffer to WAD block size!\n");
-        ret = -8;
-        goto out;
-    }
-    
     /* Start conversion process. */
     tid_upper = TITLE_UPPER(title_id);
     if (tid_upper == TITLE_TYPE_DLC)
     {
+        /* Check if a parent title ID was provided. */
+        if (argc != (ARG_COUNT + 2))
+        {
+            printf("Error: parent title ID not provided! This is required for DLC titles.\n");
+            ret = -8;
+            goto out;
+        }
+        
         /* Check if we're dealing with a DLC that can be converted. */
         if (!binIsDlcTitleConvertible(title_id))
         {
@@ -157,7 +161,7 @@ int main(int argc, char **argv)
         }
         
         /* Generate <index>.bin file(s). */
-        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
+        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size, parent_tid))
         {
             ret = -10;
             goto out;

@@ -27,7 +27,7 @@
 #include "types.h"
 #include "os.h"
 
-#define VERSION                         "0.6"
+#define VERSION                         "0.7"
 
 /* Supress clang warnings about variadic macro arguments. */
 #ifdef __clang__
@@ -56,6 +56,8 @@
 #define TITLE_TYPE_DOWNLOADABLE_CHANNEL (u32)0x00010001
 #define TITLE_TYPE_DISC_BASED_CHANNEL   (u32)0x00010004
 #define TITLE_TYPE_DLC                  (u32)0x00010005
+
+#define WAD_BLOCK_SIZE                  0x40
 
 #define SYSTEM_MENU_TID                 TITLE_ID(1, 2)
 

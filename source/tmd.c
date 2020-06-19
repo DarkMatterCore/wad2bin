@@ -41,7 +41,7 @@ u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size)
     bool success = false;
     
     /* Allocate memory for the TMD. */
-    tmd = malloc(tmd_size);
+    tmd = calloc(ALIGN_UP(tmd_size, WAD_BLOCK_SIZE), sizeof(u8));
     if (!tmd)
     {
         ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes TMD buffer!", tmd_size);
