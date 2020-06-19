@@ -6,12 +6,11 @@ Usage:
 --------------
 
 ```
-wad2bin <keys file> <device.cert> <input WAD> <output dir> [parent title ID]
+wad2bin <keys file> <device.cert> <input WAD> <output dir>
 
 Paths must not exceed 1023 characters. Relative paths are supported.
 The required directory tree for the *.bin file(s) will be created at the output directory.
 You can set your SD card root directory as the output directory.
-Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
 ```
 
 Guidelines:
@@ -22,7 +21,59 @@ Guidelines:
 * Both ticket and TMD for each converted WAD package must be installed on the target Wii console in order for this to work.
     * For this matter, the program generates a bogus WAD package at the provided output directory. It can be used with regular WAD Managers to install both ticket and TMD if needed.
 * If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
+* Channel WADs get converted to `content.bin` files, while DLC WADs get converted to `<index>.bin` files.
 * If a DLC WAD is provided, it doesn't matter if it's an uncomplete WAD with missing contents, a WAD with a tampered TMD that only references the packaged contents or a full WAD with all contents: all cases are supported by wad2bin. There's no need to provide any content indexes.
+
+Supported DLCs:
+--------------
+
+Not all DLCs can be converted to `<index>.bin` files. This is because not all games with DLCs are capable of loading DLC data stored on the SD card.
+
+For this purpose, wad2bin holds a hardcoded DLC title ID list with supported IDs, along with their parent game IDs. Only the following DLCs are supported:
+
+* Rock Band 2 (`00010000-535A41xx`) (`SZAx`):
+    * `00010005-735A41xx` (`sZAx`).
+    * `00010005-735A42xx` (`sZBx`).
+    * `00010005-735A43xx` (`sZCx`).
+    * `00010005-735A44xx` (`sZDx`).
+    * `00010005-735A45xx` (`sZEx`).
+    * `00010005-735A46xx` (`sZFx`).
+
+* Rock Band 3 (`00010000-535A42xx`) (`SZBx`):
+    * `00010005-735A4Axx` (`sZJx`).
+    * `00010005-735A4Bxx` (`sZKx`).
+    * `00010005-735A4Cxx` (`sZLx`).
+    * `00010005-735A4Dxx` (`sZMx`).
+
+* Guitar Hero: World Tour (`00010000-535841xx`) (`SXAx`):
+    * `00010005-735841xx` (`sXAx`).
+    * `00010005-73594Fxx` (`sYOx`).
+
+* Guitar Hero 5 (`00010000-535845xx`) (`SXEx`):
+    * `00010005-735845xx` (`sXEx`).
+    * `00010005-735846xx` (`sXFx`).
+    * `00010005-735847xx` (`sXGx`).
+    * `00010005-735848xx` (`sXHx`).
+
+* Guitar Hero: Warriors of Rock (`00010000-535849xx`) (`SXIx`):
+    * `00010005-735849xx` (`sXIx`).
+
+* Just Dance 2 (`00010000-534432xx`) (`SD2x`):
+    * `00010005-734432xx` (`sD2x`).
+
+* Just Dance 3 (`00010000-534A44xx`) (`SJDx`):
+    * `00010005-734A44xx` (`sJDx`).
+
+* Just Dance 4 (`00010000-534A58xx`) (`SJXx`):
+    * `00010005-734A58xx` (`sJXx`).
+
+* Just Dance 2014 (`00010000-534A4Fxx`) (`SJOx`):
+    * `00010005-734A4Fxx` (`sJOx`).
+
+* Just Dance 2015 (`00010000-534533xx`) (`SE3x`):
+    * `00010005-734533xx` (`sE3x`).
+
+Any DLCs not appearing on this list will return an error if used as the input WAD package for the program.
 
 Differences between `content.bin` files and `<index>.bin` files:
 --------------
@@ -52,6 +103,11 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 
 Changelog:
 --------------
+
+**v0.6:**
+
+* Added a hardcoded list with title IDs from DLCs that can be converted to the `<index>.bin` format. Any other DLCs will return an error. Thanks to this, it's no longer necessary to input a parent title ID.
+* Fixed support for WAD packages with content data bigger than `U32_MAX` (0xFFFFFFFF).
 
 **v0.5:**
 
