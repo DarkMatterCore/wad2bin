@@ -83,10 +83,13 @@ typedef struct {
     CertSigEcc480PubKeyEcc480 ap_cert;
 } BinContentCertArea;
 
+/// Checks if the input title ID belongs to a DLC that can be converted to the <index>.bin format.
+bool binIsDlcTitleConvertible(u64 tid);
+
 /// Generates a content.bin file using an unpacked WAD data directory and TMD data loaded into memory.
 bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size);
 
-/// Generates <index>.bin file(s) using an unpacked WAD data directory, TMD data loaded into memory and a parent title ID.
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid);
+/// Generates <index>.bin file(s) using an unpacked WAD data directory and TMD data loaded into memory.
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size);
 
 #endif /* __BIN_H__ */

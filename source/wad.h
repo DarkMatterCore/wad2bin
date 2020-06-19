@@ -83,7 +83,7 @@ typedef struct {
 /// If valid pointers are provided, certificate chain data, ticket data and/or TMD data may be saved to them.
 /// Footer data won't be unpacked.
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, u64 *out_cert_chain_size, u8 **out_tik, u64 *out_tik_size, u8 **out_tmd, \
-                                 u64 *out_tmd_size, u32 *out_tid_upper);
+                                 u64 *out_tmd_size, u64 *out_tid);
 
 /// Writes an unpacked content to a WAD package using file descriptors.
 bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, u64 cnt_size, u64 *out_aligned_cnt_size);

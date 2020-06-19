@@ -29,7 +29,7 @@
 static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, u64 cnt_size, const u8 *cnt_hash, const os_char_t *out_path, u64 *out_aligned_cnt_size);
 
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, u64 *out_cert_chain_size, u8 **out_tik, u64 *out_tik_size, u8 **out_tmd, \
-                                 u64 *out_tmd_size, u32 *out_tid_upper)
+                                 u64 *out_tmd_size, u64 *out_tid)
 {
     size_t out_path_len = 0;
     
@@ -263,10 +263,17 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     wad_offset += ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_SIZE);
     os_fseek(wad_fd, wad_offset, SEEK_SET);
     
-    /* Process content files. */
+    /* Update calculated WAD size. */
+    /* We could be dealing with a DLC WAD package with a content size field that exceeds U32_MAX. */
     content_count = bswap_16(tmd_common_block->content_count);
     tmd_contents = TMD_CONTENTS(tmd_common_block);
     
+    calc_wad_size -= ALIGN_UP(wad_header.data_size, WAD_BLOCK_SIZE);
+    for(u16 i = 0; i < content_count; i++) calc_wad_size += ALIGN_UP(bswap_64(tmd_contents[i].size), WAD_BLOCK_SIZE);
+    
+    calc_wad_size = (calc_wad_size > wad_size ? wad_size : calc_wad_size);
+    
+    /* Process content files. */
     for(u16 i = 0; i < content_count && wad_offset < calc_wad_size; i++)
     {
         u64 aligned_cnt_size = 0;
@@ -348,7 +355,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         *out_tmd_size = wad_header.tmd_size;
     }
     
-    if (out_tid_upper) *out_tid_upper = tid_upper;
+    if (out_tid) *out_tid = tik_tid;
     
     success = true;
     
