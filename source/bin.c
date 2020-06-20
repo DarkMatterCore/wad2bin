@@ -34,47 +34,50 @@
 /* Although DLCs not displayed here *can* be converted, their parent titles don't support this format, so they're excluded. */
 /* These are all disc-based games. */
 static const u32 g_supportedDLCs[] = {
+    /* The Beatles Rock Band ("R9Jx"). */
+    0x72394A00, /* "r9Jx". */
+    
     /* Rock Band 2 ("SZAx"). */
-    0x735A4100, /* "sZA" (DLC1). */
-    0x735A4200, /* "sZB" (DLC2). */
-    0x735A4300, /* "sZC" (DLC3). */
-    0x735A4400, /* "sZD" (DLC4). */
-    0x735A4500, /* "sZE" (DLC5). */
-    0x735A4600, /* "sZF" (DLC6). */
+    0x735A4100, /* "sZAx" (DLC1). */
+    0x735A4200, /* "sZBx" (DLC2). */
+    0x735A4300, /* "sZCx" (DLC3). */
+    0x735A4400, /* "sZDx" (DLC4). */
+    0x735A4500, /* "sZEx" (DLC5). */
+    0x735A4600, /* "sZFx" (DLC6). */
     
     /* Rock Band 3 ("SZBx"). */
-    0x735A4A00, /* "sZJ" (DLC1). */
-    0x735A4B00, /* "sZK" (DLC2). */
-    0x735A4C00, /* "sZL" (DLC3). */
-    0x735A4D00, /* "sZM" (DLC4). */
+    0x735A4A00, /* "sZJx" (DLC1). */
+    0x735A4B00, /* "sZKx" (DLC2). */
+    0x735A4C00, /* "sZLx" (DLC3). */
+    0x735A4D00, /* "sZMx" (DLC4). */
     
     /* Guitar Hero: World Tour ("SXAx"). */
-    0x73584100, /* "sXA" (DLC1). */
-    0x73594F00, /* "sYO" (DLC2). */
+    0x73584100, /* "sXAx" (DLC1). */
+    0x73594F00, /* "sYOx" (DLC2). */
     
     /* Guitar Hero 5 ("SXEx"). */
-    0x73584500, /* "sXE" (DLC1). */
-    0x73584600, /* "sXF" (DLC2). */
-    0x73584700, /* "sXG" (DLC3). */
-    0x73584800, /* "sXH" (DLC4). */
+    0x73584500, /* "sXEx" (DLC1). */
+    0x73584600, /* "sXFx" (DLC2). */
+    0x73584700, /* "sXGx" (DLC3). */
+    0x73584800, /* "sXHx" (DLC4). */
     
     /* Guitar Hero: Warriors of Rock ("SXIx"). */
-    0x73584900, /* "sXI". */
+    0x73584900, /* "sXIx". */
     
     /* Just Dance 2 ("SD2x"). */
-    0x73443200, /* "sD2". */
+    0x73443200, /* "sD2x". */
     
     /* Just Dance 3 ("SJDx"). */
-    0x734A4400, /* "sJD". */
+    0x734A4400, /* "sJDx". */
     
     /* Just Dance 4 ("SJXx"). */
-    0x734A5800, /* "sJX". */
+    0x734A5800, /* "sJXx". */
     
     /* Just Dance 2014 ("SJOx"). */
-    0x734A4F00, /* "sJO". */
+    0x734A4F00, /* "sJOx". */
     
     /* Just Dance 2015 ("SE3x"). */
-    0x73453300  /* "sE3". */
+    0x73453300  /* "sE3x". */
 };
 
 static const u32 g_supportedDLCsCount = MAX_ELEMENTS(g_supportedDLCs);
