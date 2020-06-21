@@ -83,8 +83,6 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path);
 
 void utilsCreateDirectoryTree(const os_char_t *path);
 
-bool utilsWritePadding(FILE *fd, u64 *size, u64 alignment);
-
 bool utilsAlignBuffer(void **buf, u64 *size, u64 alignment);
 
 void utilsGenerateAsciiStringFromTitleIdLower(u64 title_id, char *out);
