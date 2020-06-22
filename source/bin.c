@@ -33,10 +33,7 @@
 /* Array with lower TID masks from DLCs that support the <index>.bin format (region byte set to zero). */
 /* Although DLCs not displayed here *can* be converted, their parent titles don't support this format, so they're excluded. */
 /* These are all disc-based games. */
-static const u32 g_supportedDLCs[] = {
-    /* The Beatles Rock Band ("R9Jx"). */
-    0x72394A00, /* "r9Jx". */
-    
+static const u32 g_supportedDLCs[] = {    
     /* Rock Band 2 ("SZAx"). */
     0x735A4100, /* "sZAx" (DLC1). */
     0x735A4200, /* "sZBx" (DLC2). */
@@ -44,6 +41,9 @@ static const u32 g_supportedDLCs[] = {
     0x735A4400, /* "sZDx" (DLC4). */
     0x735A4500, /* "sZEx" (DLC5). */
     0x735A4600, /* "sZFx" (DLC6). */
+    
+    /* The Beatles Rock Band ("R9Jx"). */
+    0x72394A00, /* "r9Jx". */
     
     /* Rock Band 3 ("SZBx"). */
     0x735A4A00, /* "sZJx" (DLC1). */
