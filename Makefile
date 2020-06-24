@@ -6,7 +6,7 @@ TARGET			:=	$(PROJECT_NAME)$(EXEEXT)
 
 # -Wno-implicit-fallthrough is used to suppress ConvertUTF.c warnings.
 # -Wno-missing-braces is used to suppress "suggest braces around initialization of subobject" warnings under certain compilers.
-CFLAGS			:=	-std=gnu11 -fPIC -O2 -Wall -Wextra -Wpedantic -Wno-implicit-fallthrough -Wno-missing-braces $(INCLUDE)
+CFLAGS			:=	-std=gnu11 -fPIC -O2 -Wall -Wextra -Wpedantic -Wno-implicit-fallthrough -Wno-missing-braces -static-libgcc -static-libstdc++ $(INCLUDE)
 CFLAGS			+=	-D_BSD_SOURCE -D_POSIX_SOURCE -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -D_FILE_OFFSET_BITS=64
 
 LIBS			:=	-lmbedtls -lmbedx509 -lmbedcrypto -lninty-233

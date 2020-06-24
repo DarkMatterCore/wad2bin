@@ -384,6 +384,7 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
     u8 *buf = NULL;
     u64 blksize = WAD_CONTENT_BLOCKSIZE;
     u64 res = 0, write_size = 0;
+    u64 aligned_cnt_size = ALIGN_UP(cnt_size, WAD_BLOCK_SIZE);
     
     CryptoAes128CbcContext aes_ctx = {0};
     
@@ -419,8 +420,8 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
             goto out;
         }
         
-        /* Check if the current chunk isn't aligned to the AES block size. */
-        write_size = ALIGN_UP(blksize, AES_BLOCK_SIZE);
+        /* Check if the current chunk isn't aligned to the WAD block size. */
+        write_size = ALIGN_UP(blksize, WAD_BLOCK_SIZE);
         if (write_size > blksize) memset(buf + blksize, 0, write_size - blksize);
         
         /* Encrypt chunk. */
@@ -446,28 +447,6 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
         
         /* Flush data. */
         fflush(wad_fd);
-    }
-    
-    /* Write padding if necessary. */
-    u64 aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
-    if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
-    {
-        u64 new_aligned_cnt_size = aligned_cnt_size;
-        
-        if (!utilsWritePadding(wad_fd, &new_aligned_cnt_size, WAD_BLOCK_SIZE))
-        {
-            ERROR_MSG("Failed to write pad block for content \"%08" PRIx16 ".app\"!", cnt_idx);
-            goto out;
-        }
-        
-        if (sha1_ctx)
-        {
-            /* Update SHA-1 hash calculation. */
-            u8 padding[WAD_BLOCK_SIZE] = {0};
-            mbedtls_sha1_update(sha1_ctx, padding, new_aligned_cnt_size - aligned_cnt_size);
-        }
-        
-        aligned_cnt_size = new_aligned_cnt_size;
     }
     
     *out_aligned_cnt_size = aligned_cnt_size;
@@ -589,6 +568,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     u8 *buf = NULL;
     u64 blksize = WAD_CONTENT_BLOCKSIZE;
     u64 res = 0, read_size = 0;
+    u64 aligned_cnt_size = ALIGN_UP(cnt_size, WAD_BLOCK_SIZE);
     
     CryptoAes128CbcContext aes_ctx = {0};
     
@@ -635,7 +615,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
         if (blksize > (cnt_size - offset)) blksize = (cnt_size - offset);
         
         /* Read encrypted chunk. */
-        read_size = ALIGN_UP(blksize, AES_BLOCK_SIZE);
+        read_size = ALIGN_UP(blksize, WAD_BLOCK_SIZE);
         res = fread(buf, 1, read_size, wad_fd);
         if (res != read_size)
         {
@@ -673,15 +653,6 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     {
         ERROR_MSG("SHA-1 checksum mismatch!");
         goto out;
-    }
-    
-    /* Update file stream position if necessary. */
-    u64 aligned_cnt_size = ALIGN_UP(cnt_size, AES_BLOCK_SIZE);
-    if (!IS_ALIGNED(aligned_cnt_size, WAD_BLOCK_SIZE))
-    {
-        u64 new_aligned_cnt_size = ALIGN_UP(aligned_cnt_size, WAD_BLOCK_SIZE);
-        os_fseek(wad_fd, new_aligned_cnt_size - aligned_cnt_size, SEEK_CUR);
-        aligned_cnt_size = new_aligned_cnt_size;
     }
     
     *out_aligned_cnt_size = aligned_cnt_size;

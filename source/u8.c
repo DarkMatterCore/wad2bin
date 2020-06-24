@@ -36,7 +36,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     
     U8Header u8_header = {0};
     U8Node root_node = {0}, *nodes = NULL;
-    u32 node_count = 0, node_section_size = 0, str_table_size = 0, cur_file_offset = 0;
+    u32 node_count = 0, node_section_size = 0, str_table_size = 0;
     char *str_table = NULL;
     u64 header_offset = 0, res = 0;
     bool success = false;
@@ -135,7 +135,6 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     }
     
     /* Check all U8 nodes. */
-    cur_file_offset = u8_header.data_offset;
     for(u32 i = 1; i < node_count; i++)
     {
         /* Byteswap current U8 node. */
@@ -166,25 +165,21 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
         
         /* Check data offset. */
         /* Files: check if the data offset matches the current value for the calculated file offset. */
-        /* Directories: check if the data offset isn't aligned to the U8 node size, if it exceeds the node section size or if the node it points to isn't a directory node. */
-        if ((nodes[i].properties.type == U8NodeType_File && nodes[i].data_offset != cur_file_offset) || \
-            (nodes[i].properties.type == U8NodeType_Directory && (!IS_ALIGNED(nodes[i].data_offset, sizeof(U8Node)) || nodes[i].data_offset >= node_section_size || \
-            nodes[nodes[i].data_offset / sizeof(U8Node)].properties.type != U8NodeType_Directory)))
+        /* Directories: check if the data offset is equal to or greater than the node count, or if the node it points to isn't a directory node. */
+        if ((nodes[i].properties.type == U8NodeType_File && nodes[i].data_offset < u8_header.data_offset) || \
+            (nodes[i].properties.type == U8NodeType_Directory && (nodes[i].data_offset >= node_count || nodes[nodes[i].data_offset].properties.type != U8NodeType_Directory)))
         {
-            ERROR_MSG("Invalid data offset for U8 node #%u! (0x%x).", node_number);
+            ERROR_MSG("Invalid data offset for U8 node #%u! (0x%x).", node_number, nodes[i].data_offset);
             goto out;
         }
         
-        if (nodes[i].properties.type == U8NodeType_File)
+        if (nodes[i].properties.type == U8NodeType_Directory)
         {
-            /* Update file offset calculation. */
-            if (nodes[i].size > 0) cur_file_offset += ALIGN_UP(nodes[i].size, U8_FILE_ALIGNMENT);
-        } else {
             /* Check if the size value points to a node number *lower* than this directory's node number, or if it exceeds the total node count. */
             /* We could be dealing with an empty directory, so don't check if the size value is equal to this directory's node number. */
             if (nodes[i].size < node_number || nodes[i].size > node_count)
             {
-                ERROR_MSG("Invalid end node number value for U8 node #%u! (0x%x).", node_number);
+                ERROR_MSG("Invalid end node number value for U8 node #%u! (0x%x).", node_number, nodes[i].size);
                 goto out;
             }
         }
@@ -225,14 +220,18 @@ U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node
     U8Node *dir_node = NULL;
     u32 node_idx = 0;
     
-    if (!ctx || !ctx->str_table || !path || *path != '/' || !(path_len = strlen(path)) || !out_node_idx || !(dir_node = u8GetNodeByOffset(ctx, 0)))
+    if (!ctx || !ctx->str_table || !path || *path != '/' || !(path_len = strlen(path)) || !(dir_node = u8GetNodeByOffset(ctx, 0)))
     {
         ERROR_MSG("Invalid parameters!");
         return NULL;
     }
     
     /* Check if the root directory was requested. */
-    if (path_len == 1) return dir_node;
+    if (path_len == 1)
+    {
+        if (out_node_idx) *out_node_idx = 0;
+        return dir_node;
+    }
     
     /* Duplicate path to avoid problems with strtok(). */
     if (!(path_dup = strdup(path)))
@@ -260,7 +259,7 @@ U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node
         pch = strtok(NULL, "/");
     }
     
-    *out_node_idx = node_idx;
+    if (out_node_idx) *out_node_idx = node_idx;
     
 out:
     if (path_dup) free(path_dup);
@@ -275,7 +274,7 @@ U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
     U8Node *dir_node = NULL, *file_node = NULL;
     u32 node_idx = 0;
     
-    if (!ctx || !ctx->str_table || !path || *path != '/' || (path_len = strlen(path)) <= 1 || !out_node_idx)
+    if (!ctx || !ctx->str_table || !path || *path != '/' || (path_len = strlen(path)) <= 1)
     {
         ERROR_MSG("Invalid parameters!");
         return NULL;
@@ -320,7 +319,7 @@ U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx)
         goto out;
     }
     
-    *out_node_idx = node_idx;
+    if (out_node_idx) *out_node_idx = node_idx;
     
 out:
     if (path_dup) free(path_dup);
@@ -374,8 +373,6 @@ u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, u64 *o
     }
     
     U8Context u8_ctx = {0};
-    
-    u32 node_idx = 0;
     U8Node *node = NULL;
     
     u8 *file_data = NULL;
@@ -389,7 +386,7 @@ u8 *u8LoadFileDataFromU8ArchiveByPath(FILE *u8_fd, const char *file_path, u64 *o
     }
     
     /* Retrieve U8 file node by path. */
-    node = u8GetFileNodeByPath(&u8_ctx, file_path, &node_idx);
+    node = u8GetFileNodeByPath(&u8_ctx, file_path, NULL);
     if (!node)
     {
         ERROR_MSG("Failed to retrieve U8 node for \"%s\"!", file_path);

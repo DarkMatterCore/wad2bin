@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
     U8NodeProperties properties;    ///< Using a bitfield because of the odd name_offset field size.
-    u32 data_offset;                ///< Files: offset to file data (relative to the start of the U8 header). Directories: parent dir offset (relative to the start of the node table).
+    u32 data_offset;                ///< Files: offset to file data (relative to the start of the U8 header). Directories: parent dir node index (0-based).
     u32 size;                       ///< Files: data size. Directories: node number from the last file inside this directory (root node is number 1).
 } U8Node;
 
@@ -65,11 +65,11 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx);
 void u8ContextFree(U8Context *ctx);
 
 /// Retrieves an U8 directory node by its path.
-/// Its index is saved to the out_node_idx pointer.
+/// Its index is saved to the out_node_idx pointer (if provided).
 U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
 
 /// Retrieves an U8 file node by its path.
-/// Its index is saved to the out_node_idx pointer.
+/// Its index is saved to the out_node_idx pointer (if provided).
 U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
 
 /// Loads file data from an U8 file node into memory.
