@@ -65,11 +65,11 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx);
 void u8ContextFree(U8Context *ctx);
 
 /// Retrieves an U8 directory node by its path.
-/// Its index is saved to the out_node_idx pointer.
+/// Its index is saved to the out_node_idx pointer (if provided).
 U8Node *u8GetDirectoryNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
 
 /// Retrieves an U8 file node by its path.
-/// Its index is saved to the out_node_idx pointer.
+/// Its index is saved to the out_node_idx pointer (if provided).
 U8Node *u8GetFileNodeByPath(U8Context *ctx, const char *path, u32 *out_node_idx);
 
 /// Loads file data from an U8 file node into memory.
