@@ -10,7 +10,7 @@ BUTTON_FONT = monospace
 BACKGROUND_COLOR = "#20232a"
 BUTTON_COLOR = "#aaaaaa"
 ENTRY_COLOR = "#373940"
-ENTRY_FOREGROUND = "black"
+ENTRY_FOREGROUND = "#bbbbbb"
 
 LABEL_COLOR = "#61dafb"
 

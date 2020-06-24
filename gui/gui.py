@@ -3,6 +3,7 @@ import os, sys, platform, subprocess, threading
 import tkinter as tk
 import tkinter.filedialog as tkfiledialog
 import style
+from tkinter.ttk import LabelFrame, Style
 
 class themedFrame(tk.Frame):
 	def __init__(self, frame, **kw):
@@ -252,15 +253,29 @@ class CreateToolTip(object):
 		if self.tw:
 			self.tw.destroy()
 
-
-class threader_object:
-	"""an object to be declared outside of tk root so
+"""an object to be declared outside of tk root so
 	things can be called asyncronously (you cannot start
 	a new thread from within a tkinter callback so you
 	must call it from an object that exists outside)"""
+class threader_object:
+	def __init__(self):
+		self.threads = []
 
+	def do(self, func, arglist=[]):
+		t = threading.Thread(target=func, args=arglist).start()
+	
 	def do_async(self, func, arglist=[]):
-		threading.Thread(target=func, args=arglist).start()
+		t = threading.Thread(target=func, args=arglist)
+		t.start()
+		self.threads.append(t)
+
+	def join(self):
+		for t in self.threads:
+			t.join()
+		self.clear_dead()
+
+	def clear_dead(self):
+		self.threads = [t for t in self.threads if t.is_alive()]
 
 
 class gui(tk.Tk):
@@ -291,65 +306,59 @@ class gui(tk.Tk):
 
 		# -------------------------------------------------
 		container = themedFrame(outer_frame, borderwidth=0, highlightthickness=0)
-		container.place(y=85, relwidth=1, height=140)
+		container.place(y=85, relwidth=1, height=170)
 
-		path_label = tk.Label(container, text="wad paths - ", foreground=style.LABEL_COLOR,
+		path_label = tk.Label(container, text=" - Wad Paths - ", foreground=style.LABEL_COLOR,
 							 background=style.BACKGROUND_COLOR)
 		path_label.place(relwidth=1, height=20)
 		self.path_box = tk.Listbox(container, highlightthickness=0, bg=style.ENTRY_COLOR,
 								  foreground=style.ENTRY_FOREGROUND)
-		self.path_box.place(relwidth=1, height=155, y=20)
+		self.path_box.place(relwidth=1, height=115, y=20)
 		CreateToolTip(path_label,
 					  "Select the wads you wish to install to the sd card. The `add folder` button will add all wads in the selected folder, but will not check subdirs. The `remove wad` button will remove the currently selected file from the listbox.")
 
 		button_container = themedFrame(container)
-		button_container.configure(borderwidth = 0)
-		button_container.configure(highlightthickness = 0)
-		button_container.place(y = 180, relwidth = 1, height = 20)
+		button_container.place(y = 140, relwidth = 1, height = 20)
 
-		add_button = Button(button_container, self.add, text="add wad", font=style.monospace)
-		add_button.place(rely = 1, relx=0, relwidth=0.333, height=20, y=-20, width=- 6)
+		self.add_button = Button(button_container, self.add, text="add wad", font=style.monospace)
+		self.add_button.place(relx=0, relwidth=0.333, height=20, width=- 6)
 
-		add_folder_button = Button(button_container, self.add_folder, text="add folder", font=style.monospace)
-		add_folder_button.place(rely = 1, relx=0.333, relwidth=0.333, height=20, y=-20, x=+ 3, width=- 6)
+		self.add_folder_button = Button(button_container, self.add_folder, text="add folder", font=style.monospace)
+		self.add_folder_button.place(relx=0.333, relwidth=0.333, height=20, x=+ 3, width=- 6)
 
-		remove_button = Button(button_container, self.remove, text="remove wad", font=style.monospace)
-		remove_button.place(rely = 1, relx=0.666, relwidth=0.333, height=20, y=-20, x=+ 6, width=- 6)
+		self.remove_button = Button(button_container, self.remove, text="remove wad", font=style.monospace)
+		self.remove_button.place(relx=0.666, relwidth=0.333, height=20, x=+ 6, width=- 6)
 		# -------------------------------------------------
 
 		console_label = tk.Label(outer_frame, text="Console:", background="black", foreground="white",
 								 font=style.boldmonospace, borderwidth=0, highlightthickness=0)
-		console_label.place(relwidth=1, height=20, y=230)
+		console_label.place(relwidth=1, height=20, y=250)
 		self.console = ScrolledText(outer_frame, background="black", foreground="white", highlightthickness=0)
-		self.console.place(relwidth=1, relheight=1, y=250, height=- 272)
-		run_button = Button(outer_frame, self.run, text="run", font=style.boldmonospace)
-		run_button.place(relwidth=1, rely=1, y=- 22)
+		self.console.place(relwidth=1, relheight=1, y=270, height= -292)
+		self.run_button = Button(outer_frame, self.run, text="run", font=style.boldmonospace)
+		self.run_button.place(relwidth=1, rely=1, y=- 22)
 
 	def run(self):
-		self.output_to_console("-----------------------\nStarting...\n")
+		self.output_to_console("\n\n-----------------------\nStarting...\n")
 
-		args = []
 		length = 0
 
 		keys = self.keys_box.get()
 		if not keys:
 			self.output_to_console("Keys file not selected, can't continue.\n")
 			return
-		args.append(keys)
 		length += len(keys)
 
 		cert = self.cert_box.get()
 		if not cert:
 			self.output_to_console("Failed to run - No cert selected.\n")
 			return
-		args.append(cert)
 		length += len(cert)
 
 		sd = self.sd_box.get().strip()
 		if not sd:
 			self.output_to_console("Failed to run - SD path not selected.\n")
 			return
-		args.extend(sd)
 		length += len(sd)
 
 		if platform.system() == "Windows":
@@ -361,18 +370,31 @@ class gui(tk.Tk):
 			self.output_to_console("Your OS not supported yet but may be in the future.\n")
 			return
 		
+		wads = []
 		for i in range(0, self.path_box.size()):
 			path = self.path_box.get(i).strip()
 			length += len(path)
 			wads.append(path)
 
-		if (length + len("wad2bin.exe ") + 3) > 8000:
+		if (length + len("wad2bin.exe ") + 5) > 1024:
 			self.output_to_console("Failed to run - SD path not selected.\n")
 			return
 
+		script = os.path.realpath("wad2bin.exe")
+		def process_wads(wadlist):
+			for wad in wadlist:
+				self.threader.do_async(execute_script, [[script, keys, cert, wad, sd], self.output_to_console])
+				self.threader.join() #Wait til complete to start next
+
 		if wads:
-			args.extend(wads)
-			self.threader.do_async(execute_script, [args, self.output_to_console])
+			self.disable()
+			self.update_idletasks()
+			try:
+				self.threader.do(process_wads, [wads])
+			except Exception as e:
+				print(e)
+			finally:
+				self.enable()
 		else:
 			self.output_to_console("No wads selected.")
 
@@ -391,7 +413,7 @@ class gui(tk.Tk):
 			to_add = [f for f in os.listdir(dir_to_add) if (os.path.isfile(os.path.join(dir_to_add, f)) and f.endswith(".wad"))]
 			if to_add:
 				for f in to_add:
-					self.path_box.insert('end', f)
+					self.path_box.insert('end', os.path.join(dir_to_add, f))
 
 	def remove(self):
 		index = self.path_box.curselection()
@@ -407,25 +429,40 @@ class gui(tk.Tk):
 				else:
 					self.path_box.select_set(0)
 
+	def disable(self):
+		self.path_box.configure(state = "disable")
+		self.keys_box.configure(state = "disable")
+		self.sd_box.configure(state = "disable")
+		self.cert_box.configure(state = "disable")
+		self.add_button.configure(state = "disable")
+		self.add_folder_button.configure(state = "disable")
+		self.remove_button.configure(state = "disable")
+		self.run_button.configure(state = "disable")
 
-def execute_script(wad_paths, printer):
-	"""Wrapper function to pipe install script output to a printer"""
-	print(f"Running wad2bin.exe")
-	try:
-		args = ["wad2bin.exe"]
-		args.extend(wad_paths)
-		p = subprocess.Popen(args,
-							 stdout=subprocess.PIPE,
-							 stderr=subprocess.STDOUT,
-							 bufsize=1,
-							 )
+	def enable(self):
+		self.path_box.configure(state = "normal")
+		self.keys_box.configure(state = "normal")
+		self.sd_box.configure(state = "normal")
+		self.cert_box.configure(state = "normal")
+		self.add_button.configure(state = "normal")
+		self.add_folder_button.configure(state = "normal")
+		self.remove_button.configure(state = "normal")
+		self.run_button.configure(state = "normal")
 
-		with p.stdout:
-			for line in iter(p.stdout.readline, b''):
-				printer(line)
-		p.wait()
-	except Exception as e:
-		printer(f"Error while executing script with path - {wad_paths} | Exception - {e}\n")
+
+def execute_script(args, printer):
+	p = subprocess.Popen(args,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.STDOUT,
+		bufsize=1,
+		)
+
+	with p.stdout:
+		for line in iter(p.stdout.readline, b''):
+			printer(line)
+	p.wait()
+	# except Exception as e:
+	# 	printer(f"Error while executing script with path - {wad_paths} | Exception - {e}\n")
 
 
 t = threader_object()
