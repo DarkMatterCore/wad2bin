@@ -36,7 +36,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     
     U8Header u8_header = {0};
     U8Node root_node = {0}, *nodes = NULL;
-    u32 node_count = 0, node_section_size = 0, str_table_size = 0, cur_file_offset = 0;
+    u32 node_count = 0, node_section_size = 0, str_table_size = 0;
     char *str_table = NULL;
     u64 header_offset = 0, res = 0;
     bool success = false;
@@ -135,7 +135,6 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     }
     
     /* Check all U8 nodes. */
-    cur_file_offset = u8_header.data_offset;
     for(u32 i = 1; i < node_count; i++)
     {
         /* Byteswap current U8 node. */
@@ -167,24 +166,21 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
         /* Check data offset. */
         /* Files: check if the data offset matches the current value for the calculated file offset. */
         /* Directories: check if the data offset isn't aligned to the U8 node size, if it exceeds the node section size or if the node it points to isn't a directory node. */
-        if ((nodes[i].properties.type == U8NodeType_File && nodes[i].data_offset != cur_file_offset) || \
+        if ((nodes[i].properties.type == U8NodeType_File && nodes[i].data_offset < u8_header.data_offset) || \
             (nodes[i].properties.type == U8NodeType_Directory && (!IS_ALIGNED(nodes[i].data_offset, sizeof(U8Node)) || nodes[i].data_offset >= node_section_size || \
             nodes[nodes[i].data_offset / sizeof(U8Node)].properties.type != U8NodeType_Directory)))
         {
-            ERROR_MSG("Invalid data offset for U8 node #%u! (0x%x).", node_number);
+            ERROR_MSG("Invalid data offset for U8 node #%u! (0x%x).", node_number, nodes[i].data_offset);
             goto out;
         }
         
-        if (nodes[i].properties.type == U8NodeType_File)
+        if (nodes[i].properties.type == U8NodeType_Directory)
         {
-            /* Update file offset calculation. */
-            if (nodes[i].size > 0) cur_file_offset += ALIGN_UP(nodes[i].size, U8_FILE_ALIGNMENT);
-        } else {
             /* Check if the size value points to a node number *lower* than this directory's node number, or if it exceeds the total node count. */
             /* We could be dealing with an empty directory, so don't check if the size value is equal to this directory's node number. */
             if (nodes[i].size < node_number || nodes[i].size > node_count)
             {
-                ERROR_MSG("Invalid end node number value for U8 node #%u! (0x%x).", node_number);
+                ERROR_MSG("Invalid end node number value for U8 node #%u! (0x%x).", node_number, nodes[i].size);
                 goto out;
             }
         }
