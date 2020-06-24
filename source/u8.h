@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
     U8NodeProperties properties;    ///< Using a bitfield because of the odd name_offset field size.
-    u32 data_offset;                ///< Files: offset to file data (relative to the start of the U8 header). Directories: parent dir offset (relative to the start of the node table).
+    u32 data_offset;                ///< Files: offset to file data (relative to the start of the U8 header). Directories: parent dir node index (0-based).
     u32 size;                       ///< Files: data size. Directories: node number from the last file inside this directory (root node is number 1).
 } U8Node;
 
