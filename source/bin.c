@@ -163,7 +163,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     device_cert = keysGetDeviceCertificate();
     
     /* Initialize SHA-1 context used to calculate a checksum over the backup area. */
-    /* Needed to generate the ECSDA signature at the start of Part F. */
+    /* Needed to generate the ECDSA signature at the start of Part F. */
     mbedtls_sha1_init(&sha1_ctx);
     mbedtls_sha1_starts(&sha1_ctx);
     
@@ -434,13 +434,13 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     
     /* Prepare certificate area (Part F). */
     
-    /* Generate backup area ECSDA signature using the AP private key and the SHA-1 we calculated. */
-    cryptoGenerateEcsdaSignatureWithHash(ap_private_key, cert_area.signature, backup_area_hash, true);
+    /* Generate backup area ECDSA signature using the AP private key and the SHA-1 we calculated. */
+    cryptoGenerateEcdsaSignatureWithHash(ap_private_key, cert_area.signature, backup_area_hash, true);
     
     /* Copy device certificate. */
     memcpy(&(cert_area.device_cert), device_cert, sizeof(CertSigEcc480PubKeyEcc480));
     
-    /* Set AP certificate signature type to ECSDA + SHA-1. */
+    /* Set AP certificate signature type to ECDSA + SHA-1. */
     cert_area.ap_cert.sig_block.sig_type = bswap_32((u32)SignatureType_Ecc480Sha1);
     
     /* Set AP certificate signature issuer. */
@@ -456,8 +456,8 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     /* Generate AP certificate public key using the AP private key. */
     cryptoGenerateEccPublicKey(ap_private_key, cert_area.ap_cert.pub_key_block.public_key);
     
-    /* Generate AP certificate ECSDA signature using the ECC private key. */
-    cryptoGenerateEcsdaSignatureWithData(ecc_private_key, cert_area.ap_cert.sig_block.signature, &(cert_area.ap_cert.sig_block.issuer), sizeof(cert_area.ap_cert.sig_block.issuer) + \
+    /* Generate AP certificate ECDSA signature using the ECC private key. */
+    cryptoGenerateEcdsaSignatureWithData(ecc_private_key, cert_area.ap_cert.sig_block.signature, &(cert_area.ap_cert.sig_block.issuer), sizeof(cert_area.ap_cert.sig_block.issuer) + \
                                        sizeof(CertCommonBlock) + sizeof(CertPublicKeyBlockEcc480), false);
     
     /* Write plaintext certificate area (Part F). */

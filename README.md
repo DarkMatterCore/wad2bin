@@ -113,7 +113,7 @@ Differences between `content.bin` files and `<index>.bin` files:
     * A 0x640 byte-long title info header, which holds data such as title ID and a copy of the IMET header from the channel's `opening.bnr` (`00000000.app`).
     * A copy of the `/meta/icon.bin` file entry from the `opening.bnr` U8 archive, with a variable size.
 * `content.bin` files also hold a trailing certificate area placed after the encrypted contents, which contains:
-    * An ECSDA signature calculated over the whole backup WAD package area (using the console-specific ECC private key).
+    * An ECDSA signature calculated over the whole backup WAD package area (using the console-specific ECC private key).
     * A copy of the console-specific ECC-B233 device certificate (also known as "NG" cert).
     * A title-issued ECC-B233 certificate (also known as "AP" cert), signed using the console-specific ECC private key. Its ECC public key is an ECDH shared secret generated with a custom ECC private key. The issuer title is always the System Menu (00000001-00000002).
 * On the other hand, while `<index>.bin` files don't include any of the leading and trailing blocks from `content.bin` files, they are only allowed to hold a single encrypted content at a time, which index is used as part of the filename expressed in base 10 notation (e.g. `000.bin`).
@@ -121,7 +121,7 @@ Differences between `content.bin` files and `<index>.bin` files:
 Dependencies:
 --------------
 
-* [ninty-233](https://github.com/jbop1626/ninty-233) (licensed under GPLv3 or later) is used for ECDH data generation and ECSDA signing/verification.
+* [ninty-233](https://github.com/jbop1626/ninty-233) (licensed under GPLv3 or later) is used for ECDH data generation and ECDSA signing/verification.
 * [mbedtls](https://tls.mbed.org) (licensed under Apache 2.0) is used for hash calculation and AES-CBC crypto operations.
 * Keydata parsing based on code from [hactool](https://github.com/SciresM/hactool) (licensed under ISC).
 

@@ -46,7 +46,7 @@
 
 #define ECC_PRIV_KEY_SIZE   32
 #define ECC_PUB_KEY_SIZE    64
-#define ECSDA_SIG_SIZE      64
+#define ECDSA_SIG_SIZE      64
 
 /// Used to hold AES-128-CBC crypto status.
 typedef struct {
@@ -63,12 +63,12 @@ bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const v
 /// Simple all-in-one AES-128-CBC crypto function.
 bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, u64 size, bool encrypt);
 
-/// Generates an ECSDA signature using the provided ECC private key.
+/// Generates an ECDSA signature using the provided ECC private key.
 /// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.
-void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, u64 size, bool padded_sig);
+void cryptoGenerateEcdsaSignatureWithData(const void *private_key, void *dst, const void *src, u64 size, bool padded_sig);
 
-/// Same as cryptoGenerateEcsdaSignatureWithData, but takes an input SHA-1 hash instead of calculating it on its own over a provided memory block.
-void cryptoGenerateEcsdaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig);
+/// Same as cryptoGenerateEcdsaSignatureWithData, but takes an input SHA-1 hash instead of calculating it on its own over a provided memory block.
+void cryptoGenerateEcdsaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig);
 
 /// Generates an ECC public key using the provided ECC private key.
 /// Takes care of handling key padding when needed. The generated key can be used in AP certificates.

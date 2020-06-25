@@ -228,7 +228,7 @@ bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type,
         case SignatureType_Ecc480Sha256:
             type = TmdType_SigEcc480;
             offset += sizeof(SignatureBlockEcc480);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECDSA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Hmac160Sha1:
             type = TmdType_SigHmac160;
