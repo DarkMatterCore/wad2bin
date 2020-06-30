@@ -134,6 +134,14 @@ bool tikIsTitleExportable(TikCommonBlock *tik_common_block)
     return (tid_upper == TITLE_TYPE_DOWNLOADABLE_CHANNEL || tid_upper == TITLE_TYPE_DISC_BASED_CHANNEL || tid_upper == TITLE_TYPE_DLC);
 }
 
+//bool tikVerifySignature
+
+
+
+
+
+
+
 void tikFakesignTicket(void *buf, u64 buf_size)
 {
     if (!buf || buf_size < TIK_MIN_SIZE) return;
@@ -180,13 +188,23 @@ void tikFakesignTicket(void *buf, u64 buf_size)
     tik_common_block->console_id = 0;
     
     /* Modify ticket until we get a hash that starts with 0x00. */
-    u8 hash[SHA1_HASH_SIZE] = {0};
+    u8 hash[SHA256_HASH_SIZE] = {0};
     u16 *padding = (u16*)tik_common_block->reserved_3;
+    u32 sig_type = signatureGetSigType(buf);
     
     for(u16 i = 0; i < 65535; i++)
     {
         *padding = bswap_16(i);
-        mbedtls_sha1((u8*)tik_common_block, sizeof(TikCommonBlock), hash);
+        
+        if (sig_type == SignatureType_Rsa4096Sha1 || sig_type == SignatureType_Rsa2048Sha1 || sig_type == SignatureType_Ecc480Sha1 || sig_type == SignatureType_Hmac160Sha1)
+        {
+            mbedtls_sha1((u8*)tik_common_block, sizeof(TikCommonBlock), hash);
+        } else
+        if (sig_type == SignatureType_Rsa4096Sha256 || sig_type == SignatureType_Rsa2048Sha256 || sig_type == SignatureType_Ecc480Sha256)
+        {
+            mbedtls_sha256((u8*)tik_common_block, sizeof(TikCommonBlock), hash, 0);
+        }
+        
         if (hash[0] == 0) break;
     }
 }
@@ -237,8 +255,7 @@ static bool tikGetTicketTypeAndSize(const void *buf, u64 buf_size, u8 *out_type,
             return false;
     }
     
-    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
-    
+    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(TikCommonBlock, issuer), ((TikCommonBlock*)(buf_u8 + offset))->issuer);
     offset += sizeof(TikCommonBlock);
     
     if (offset > buf_size)

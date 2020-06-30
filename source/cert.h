@@ -26,7 +26,8 @@
 
 #include "signature.h"
 
-#define CERT_MIN_SIZE   0x140   /* Equivalent to sizeof(CertSigHmac160PubKeyEcc480) */
+#define SIGNED_CERT_MAX_SIZE    (u64)sizeof(CertSigRsa4096PubKeyRsa4096)
+#define SIGNED_CERT_MIN_SIZE    (u64)sizeof(CertSigHmac160PubKeyEcc480)
 
 typedef enum {
     CertType_None                     = 0,
@@ -53,6 +54,7 @@ typedef enum {
 
 /// Placed after the certificate signature block.
 typedef struct {
+    char issuer[0x40];
     u32 pub_key_type;   ///< CertPubKeyType. Stored using big endian byte order.
     char name[0x40];
     u32 date;
@@ -147,10 +149,89 @@ typedef struct {
     CertPublicKeyBlockEcc480 pub_key_block;
 } CertSigHmac160PubKeyEcc480;
 
-/// Reads a raw certificate chain from a file and validates all signature and public key sizes.
-u8 *certReadRawCertificateChainFromFile(FILE *fd, u64 cert_chain_size);
+/// Used to store certificate data.
+typedef struct {
+    u8 type;                        ///< CertType.
+    u64 size;                       ///< Raw certificate size.
+    u8 data[SIGNED_CERT_MAX_SIZE];  ///< Raw certificate data.
+} Certificate;
 
-/// Returns a pointer to the common certificate block from a certificate stored in a memory buffer.
-CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, u64 buf_size);
+/// Used to store two or more certificates.
+typedef struct {
+    u32 count;
+    Certificate *certs;
+} CertificateChain;
+
+/// Reads a certificate chain from a file and validates all signatures (whenever possible).
+/// A CertificateChain element is filled with the data from all read certificates.
+/// Optionally, a pointer to the raw certificate chain can be returned if a valid out_raw_chain pointer is provided.
+bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain, u8 **out_raw_chain);
+
+/// Frees a populated CertificateChain element.
+ALWAYS_INLINE void certFreeCertificateChain(CertificateChain *cert_chain)
+{
+    if (!cert_chain) return;
+    if (cert_chain->certs) free(cert_chain->certs);
+    memset(cert_chain, 0, sizeof(CertificateChain));
+}
+
+/// Helper inline functions.
+
+ALWAYS_INLINE CertCommonBlock *certGetCommonBlock(void *buf)
+{
+    return (CertCommonBlock*)signatureGetPayload(buf);
+}
+
+ALWAYS_INLINE bool certIsValidPublicKeyType(u32 type)
+{
+    return (type == CertPubKeyType_Rsa4096 || type == CertPubKeyType_Rsa2048 || type == CertPubKeyType_Ecc480);
+}
+
+ALWAYS_INLINE u8 *certGetPublicKey(CertCommonBlock *cert_common_block)
+{
+    return ((cert_common_block && certIsValidPublicKeyType(bswap_32(cert_common_block->pub_key_type))) ? ((u8*)cert_common_block + sizeof(CertCommonBlock)) : NULL);
+}
+
+ALWAYS_INLINE u64 certGetPublicKeySize(u32 type)
+{
+    return (u64)(type == CertPubKeyType_Rsa4096 ? MEMBER_SIZE(CertPublicKeyBlockRsa4096, public_key) : \
+                (type == CertPubKeyType_Rsa2048 ? MEMBER_SIZE(CertPublicKeyBlockRsa2048, public_key) : \
+                (type == CertPubKeyType_Ecc480  ? MEMBER_SIZE(CertPublicKeyBlockEcc480,  public_key) : 0)));
+}
+
+ALWAYS_INLINE u64 certGetPublicKeyBlockSize(u32 type)
+{
+    return (u64)(type == CertPubKeyType_Rsa4096 ? sizeof(CertPublicKeyBlockRsa4096) : \
+                (type == CertPubKeyType_Rsa2048 ? sizeof(CertPublicKeyBlockRsa2048) : \
+                (type == CertPubKeyType_Ecc480  ? sizeof(CertPublicKeyBlockEcc480)  : 0)));
+}
+
+ALWAYS_INLINE u32 certGetPublicExponent(CertCommonBlock *cert_common_block)
+{
+    if (!cert_common_block) return 0;
+    u32 pub_key_type = bswap_32(cert_common_block->pub_key_type);
+    return bswap_32(*((u32*)(certGetPublicKey(cert_common_block) + certGetPublicKeySize(pub_key_type))));
+}
+
+ALWAYS_INLINE bool certIsValidCertificate(void *buf)
+{
+    CertCommonBlock *cert_common_block = certGetCommonBlock(buf);
+    return (cert_common_block != NULL && certIsValidPublicKeyType(bswap_32(cert_common_block->pub_key_type)));
+}
+
+ALWAYS_INLINE u64 certGetSignedCertificateSize(void *buf)
+{
+    if (!certIsValidCertificate(buf)) return 0;
+    u32 sig_type = signatureGetSigType(buf);
+    CertCommonBlock *cert_common_block = certGetCommonBlock(buf);
+    return (signatureGetBlockSize(sig_type) + (u64)sizeof(CertCommonBlock) + certGetPublicKeyBlockSize(bswap_32(cert_common_block->pub_key_type)));
+}
+
+ALWAYS_INLINE u64 certGetSignedCertificateHashAreaSize(void *buf)
+{
+    if (!certIsValidCertificate(buf)) return 0;
+    CertCommonBlock *cert_common_block = certGetCommonBlock(buf);
+    return ((u64)sizeof(CertCommonBlock) + certGetPublicKeyBlockSize(bswap_32(cert_common_block->pub_key_type)));
+}
 
 #endif /* __CERT_H__ */

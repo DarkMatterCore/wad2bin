@@ -143,6 +143,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     BinContentCertArea cert_area = {0};
     u8 ap_private_key[ECC_PRIV_KEY_SIZE - 2] = {0};
     ap_private_key[ECC_PRIV_KEY_SIZE - 3] = 1; /* Keep it simple, don't generate a random value for the key. */
+    u8 ap_cert_hash[SHA1_HASH_SIZE] = {0};
     
     FILE *content_bin = NULL;
     
@@ -409,13 +410,16 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         
         /* Write encrypted content file. */
         write_res = wadWriteUnpackedContentToPackage(content_bin, prng_key, cnt_iv, &sha1_ctx, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
-        if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
         
         /* Close content file. */
         fclose(cnt_fd);
         
         /* Stop process if there was an error. */
-        if (!write_res) goto out;
+        if (!write_res)
+        {
+            ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
+            goto out;
+        }
         
         /* Print content information. */
         printf("  Content #%u:\n", cnt_idx + 1);
@@ -435,7 +439,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     /* Prepare certificate area (Part F). */
     
     /* Generate backup area ECDSA signature using the AP private key and the SHA-1 we calculated. */
-    cryptoGenerateEcdsaSignatureWithHash(ap_private_key, cert_area.signature, backup_area_hash, true);
+    cryptoGenerateEcdsaSignature(ap_private_key, cert_area.signature, true, backup_area_hash, SHA1_HASH_SIZE);
     
     /* Copy device certificate. */
     memcpy(&(cert_area.device_cert), device_cert, sizeof(CertSigEcc480PubKeyEcc480));
@@ -444,7 +448,8 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     cert_area.ap_cert.sig_block.sig_type = bswap_32((u32)SignatureType_Ecc480Sha1);
     
     /* Set AP certificate signature issuer. */
-    snprintf(cert_area.ap_cert.sig_block.issuer, sizeof(cert_area.ap_cert.sig_block.issuer), "Root-CA00000001-MS00000002-NG%08" PRIx32, console_id);
+    snprintf(cert_area.ap_cert.cert_common_block.issuer, sizeof(cert_area.ap_cert.cert_common_block.issuer), "%.*s-%.*s", 26, cert_area.device_cert.cert_common_block.issuer, 10, \
+             cert_area.device_cert.cert_common_block.name);
     
     /* Set AP certificate public key type to ECC-B233. */
     cert_area.ap_cert.cert_common_block.pub_key_type = bswap_32((u32)CertPubKeyType_Ecc480);
@@ -457,8 +462,16 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     cryptoGenerateEccPublicKey(ap_private_key, cert_area.ap_cert.pub_key_block.public_key);
     
     /* Generate AP certificate ECDSA signature using the ECC private key. */
-    cryptoGenerateEcdsaSignatureWithData(ecc_private_key, cert_area.ap_cert.sig_block.signature, &(cert_area.ap_cert.sig_block.issuer), sizeof(cert_area.ap_cert.sig_block.issuer) + \
-                                       sizeof(CertCommonBlock) + sizeof(CertPublicKeyBlockEcc480), false);
+    mbedtls_sha1((u8*)&(cert_area.ap_cert.cert_common_block), sizeof(CertCommonBlock) + sizeof(CertPublicKeyBlockEcc480), ap_cert_hash);
+    cryptoGenerateEcdsaSignature(ecc_private_key, cert_area.ap_cert.sig_block.signature, false, ap_cert_hash, SHA1_HASH_SIZE);
+    
+    /* Verify generated ECDSA signatures (probably overkill, but it's better to be safe than sorry). */
+    if (!cryptoVerifyEcdsaSignature(cert_area.device_cert.pub_key_block.public_key, cert_area.ap_cert.sig_block.signature, false, ap_cert_hash, SHA1_HASH_SIZE) || \
+        !cryptoVerifyEcdsaSignature(cert_area.ap_cert.pub_key_block.public_key, cert_area.signature, true, backup_area_hash, SHA1_HASH_SIZE))
+    {
+        ERROR_MSG("AP cert and/or backup WAD ECDSA signature verification failed!");
+        goto out;
+    }
     
     /* Write plaintext certificate area (Part F). */
     res = fwrite(&cert_area, 1, sizeof(BinContentCertArea), content_bin);

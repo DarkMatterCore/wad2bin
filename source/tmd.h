@@ -27,13 +27,25 @@
 #include "signature.h"
 #include "crypto.h"
 
-#define TMD_MIN_SIZE                0x108   /* Equivalent to sizeof(TmdSigHmac160) + sizeof(TmdContentRecord) */
-#define TMD_MAX_CONTENT_COUNT       512
-#define TMD_COMMON_BLOCK_SIZE(x)    (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
-#define TMD_CONTENTS(x)             ((TmdContentRecord*)(((u8*)(x)) + sizeof(TmdCommonBlock)))
-
 #define TMD_TARGET_SYSTEM_STR(x)    ((x) == TmdTargetSystem_Wii ? "Wii" : ((x) == TmdTargetSystem_vWii ? "vWii" : "Unknown"))
 #define TMD_CONTENT_REC_TYPE_STR(x) ((x) == TmdContentRecordType_Normal ? "Normal" : ((x) == TmdContentRecordType_DLC ? "DLC" : ((x) == TmdContentRecordType_Shared ? "Shared" : "Unknown")))
+
+/* Based on macros from libogc's es.h. */
+
+#define TMD_COMMON_BLOCK_SIZE(x)    (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
+#define TMD_MIN_SIZE                0x108   /* Equivalent to sizeof(TmdSigHmac160) + sizeof(TmdContentRecord) */
+
+#define TMD_COMMON_BLOCK(x)         ((TmdCommonBlock*)SIGNATURE_PAYLOAD((x)))
+
+#define TMD_SIZE(x)                 (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
+#define TMD_CONTENTS(x)             ((TmdContentRecord*)(((u8*)(x)) + sizeof(TmdCommonBlock)))
+
+#define TMD_MAX_CONTENT_COUNT       512
+
+#define SIGNED_TMD_SIZE(x)          (SIGNATURE_SIZE((x)) + TMD_SIZE(TMD_COMMON_BLOCK((x))))
+
+#define SIGNED_TMD_MAX_SIZE         (sizeof(TmdSigRsa4096) + (TMD_MAX_CONTENT_COUNT * sizeof(TmdContentRecord)))
+#define SIGNED_TMD_MIN_SIZE         (sizeof(TmdSigHmac160) + sizeof(TmdContentRecord))
 
 typedef enum {
     TmdType_None        = 0,
@@ -62,22 +74,9 @@ typedef enum {
     TmdAccessRights_DriveInterface = BIT(1)
 } TmdAccessRights;
 
-typedef enum {
-    TmdContentRecordType_Normal = 0x0001,
-    TmdContentRecordType_DLC    = 0x4001,
-    TmdContentRecordType_Shared = 0x8001
-} TmdContentRecordType;
-
+/// Placed after the TMD signature block.
 typedef struct {
-    u32 content_id;
-    u16 index;
-    u16 type;                   ///< TmdContentRecordType.
-    u64 size;
-    u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
-} PACKED TmdContentRecord;
-
-/// Placed after the ticket signature block.
-typedef struct {
+    char issuer[0x40];
     u8 tmd_version;
     u8 ca_crl_version;
     u8 signer_crl_version;
@@ -99,9 +98,25 @@ typedef struct {
     u8 reserved_4[0x02];
 } PACKED TmdCommonBlock;
 
+typedef enum {
+    TmdContentRecordType_Normal = 0x0001,
+    TmdContentRecordType_DLC    = 0x4001,
+    TmdContentRecordType_Shared = 0x8001
+} TmdContentRecordType;
+
+/// Placed after the TMD common block.
+typedef struct {
+    u32 content_id;
+    u16 index;
+    u16 type;                   ///< TmdContentRecordType.
+    u64 size;
+    u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
+} PACKED TmdContentRecord;
+
 typedef struct {
     SignatureBlockRsa4096 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigRsa4096;
 
 typedef struct {
@@ -112,11 +127,13 @@ typedef struct {
 typedef struct {
     SignatureBlockEcc480 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigEcc480;
 
 typedef struct {
     SignatureBlockHmac160 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigHmac160;
 
 /// Reads a TMD from a file and validates its signature size.

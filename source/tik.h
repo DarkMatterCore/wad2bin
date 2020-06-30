@@ -27,7 +27,8 @@
 #include "signature.h"
 #include "crypto.h"
 
-#define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160) */
+#define TIK_MAX_SIZE    0x3A4   /* Equivalent to sizeof(TikSigRsa4096). */
+#define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160). */
 
 typedef enum {
     TikType_None        = 0,
@@ -55,6 +56,7 @@ typedef struct {
 
 /// Placed after the ticket signature block.
 typedef struct {
+    char issuer[0x40];
     u8 ecdh_data[0x3C];             ///< ECDH data. Used to generate one-time key during install of console specific titles.
     u8 reserved_1[0x03];
     u8 titlekey[AES_BLOCK_SIZE];    ///< Encrypted titlekey. Its decrypted form is used to encrypt all content files from a title.
@@ -94,6 +96,16 @@ typedef struct {
     TikCommonBlock tik_common_block;
 } TikSigHmac160;
 
+/// Used to store ticket type, size and raw data.
+typedef struct {
+    u8 type;                ///< TikType.
+    u64 size;               ///< Raw ticket size.
+    u8 data[TIK_MAX_SIZE];  ///< Raw ticket data.
+} Ticket;
+
+
+
+
 /// Reads a ticket from a file and validates its signature size.
 u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size);
 
@@ -103,6 +115,13 @@ TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_tic
 
 /// Checks the Title ID from a common ticket block to determine if the title is exportable.
 bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
+
+
+
+
+
+
+
 
 /// Fakesigns a ticket stored in a buffer.
 void tikFakesignTicket(void *buf, u64 buf_size);

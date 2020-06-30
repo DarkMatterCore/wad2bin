@@ -53,6 +53,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     u32 console_id = keysGetConsoleId();
     
     u8 *cert_chain = NULL;
+    CertificateChain chain_data = {0};
     
     u8 *ticket = NULL;
     TikCommonBlock *tik_common_block = NULL;
@@ -128,10 +129,9 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     wad_offset += sizeof(WadInstallablePackageHeader);
     
     /* Read certificate chain. */
-    cert_chain = certReadRawCertificateChainFromFile(wad_fd, wad_header.cert_chain_size);
-    if (!cert_chain)
+    if (!certReadCertificateChainFromFile(wad_fd, wad_header.cert_chain_size, &chain_data, &cert_chain))
     {
-        ERROR_MSG("Invalid certificate chain in \"" OS_PRINT_STR "\"!", wad_path);
+        ERROR_MSG("Failed to read certificate chain from \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
     }
     
@@ -171,7 +171,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     }
     
     /* Print ticket information */
-    utilsPrintHexData("  Encrypted Titlekey:     ", tik_common_block->titlekey, AES_BLOCK_SIZE);
+    utilsPrintHexData("  Encrypted titlekey:     ", tik_common_block->titlekey, AES_BLOCK_SIZE);
     printf("  ID:                     %016" PRIx64 ".\n", bswap_64(tik_common_block->ticket_id));
     printf("  Console ID:             %08" PRIx32 ".\n", bswap_32(tik_common_block->console_id));
     printf("  Title ID:               %016" PRIx64 ".\n", bswap_64(tik_common_block->title_id));
@@ -187,13 +187,29 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         goto out;
     }
     
-    /* Check if the ticket was issued for the target console. */
-    /* If not, then we'll need to fakesign it. */
+    
+    
+    
+    
+    /* Check if the ticket signature is valid. */
+    /* If not, then we'll need to fakesign the ticket. */
+    
+    
+    
+    
+    
     if (bswap_32(tik_common_block->console_id) != console_id)
     {
         tikFakesignTicket(ticket, wad_header.ticket_size);
         printf("Ticket fakesigned (not issued for target console).\n\n");
     }
+    
+    
+    
+    
+    
+    
+    
     
     /* Save ticket. */
     os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "tik.bin");
@@ -364,6 +380,8 @@ out:
     
     if (ticket && (!success || (success && !save_ticket))) free(ticket);
     
+    certFreeCertificateChain(&chain_data);
+    
     if (cert_chain && (!success || (success && !save_cert_chain))) free(cert_chain);
     
     if (wad_fd) fclose(wad_fd);
@@ -465,7 +483,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, u8 *cert_chain, u64
 {
     size_t out_path_len = 0;
     
-    if (!out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || cert_chain_size < CERT_MIN_SIZE || !ticket || ticket_size < TIK_MIN_SIZE || !tmd || tmd_size < TMD_MIN_SIZE)
+    if (!out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || cert_chain_size < SIGNED_CERT_MIN_SIZE || !ticket || ticket_size < TIK_MIN_SIZE || !tmd || tmd_size < TMD_MIN_SIZE)
     {
         ERROR_MSG("Invalid parameters!");
         return false;

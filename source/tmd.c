@@ -181,14 +181,24 @@ void tmdFakesignTitleMetadata(void *buf, u64 buf_size)
     }
     
     /* Modify TMD until we get a hash that starts with 0x00. */
-    u8 hash[SHA1_HASH_SIZE] = {0};
+    u8 hash[SHA256_HASH_SIZE] = {0};
     u16 *padding = (u16*)tmd_common_block->reserved_4;
     u64 tmd_size = TMD_COMMON_BLOCK_SIZE(tmd_common_block);
+    u32 sig_type = signatureGetSigType(buf);
     
     for(u16 i = 0; i < 65535; i++)
     {
         *padding = bswap_16(i);
-        mbedtls_sha1((u8*)tmd_common_block, tmd_size, hash);
+        
+        if (sig_type == SignatureType_Rsa4096Sha1 || sig_type == SignatureType_Rsa2048Sha1 || sig_type == SignatureType_Ecc480Sha1 || sig_type == SignatureType_Hmac160Sha1)
+        {
+            mbedtls_sha1((u8*)tmd_common_block, tmd_size, hash);
+        } else
+        if (sig_type == SignatureType_Rsa4096Sha256 || sig_type == SignatureType_Rsa2048Sha256 || sig_type == SignatureType_Ecc480Sha256)
+        {
+            mbedtls_sha256((u8*)tmd_common_block, tmd_size, hash, 0);
+        }
+        
         if (hash[0] == 0) break;
     }
 }
@@ -240,10 +250,10 @@ bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type,
             return false;
     }
     
-    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
-    
     tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
     offset += sizeof(TmdCommonBlock);
+    
+    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(TmdCommonBlock, issuer), tmd_common_block->issuer);
     
     /* Retrieve content count. */
     u16 content_count = bswap_16(tmd_common_block->content_count);
