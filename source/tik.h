@@ -24,11 +24,11 @@
 #ifndef __TIK_H__
 #define __TIK_H__
 
-#include "signature.h"
+#include "cert.h"
 #include "crypto.h"
 
-#define TIK_MAX_SIZE    0x3A4   /* Equivalent to sizeof(TikSigRsa4096). */
-#define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160). */
+#define SIGNED_TIK_MAX_SIZE    (u64)sizeof(TikSigRsa4096)
+#define SIGNED_TIK_MIN_SIZE    (u64)sizeof(TikSigHmac160)
 
 typedef enum {
     TikType_None        = 0,
@@ -98,32 +98,32 @@ typedef struct {
 
 /// Used to store ticket type, size and raw data.
 typedef struct {
-    u8 type;                ///< TikType.
-    u64 size;               ///< Raw ticket size.
-    u8 data[TIK_MAX_SIZE];  ///< Raw ticket data.
+    u8 type;                        ///< TikType.
+    u64 size;                       ///< Raw ticket size.
+    bool valid_sig;                 ///< Determines if the ticket signature is valid or not.
+    u8 data[SIGNED_TIK_MAX_SIZE];   ///< Raw ticket data.
 } Ticket;
 
+/// Reads a ticket from a file and validates its signature.
+bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, CertificateChain *chain);
 
-
-
-/// Reads a ticket from a file and validates its signature size.
-u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size);
-
-/// Returns a pointer to the common ticket block from a ticket stored in a memory buffer.
-/// Optionally, it also saves the ticket type to an input pointer if provided.
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_ticket_type);
-
-/// Checks the Title ID from a common ticket block to determine if the title is exportable.
+/// Checks the Title ID from a ticket common block to determine if the title is exportable.
 bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
 
+/// Fakesigns a ticket.
+void tikFakesignTicket(Ticket *ticket);
 
+/// Helper inline functions.
 
+ALWAYS_INLINE TikCommonBlock *tikGetCommonBlock(void *buf)
+{
+    return (TikCommonBlock*)signatureGetPayload(buf);
+}
 
-
-
-
-
-/// Fakesigns a ticket stored in a buffer.
-void tikFakesignTicket(void *buf, u64 buf_size);
+ALWAYS_INLINE u64 tikGetSignedTicketSize(void *buf)
+{
+    TikCommonBlock *tik_common_block = tikGetCommonBlock(buf);
+    return (u64)(tik_common_block != NULL ? (signatureGetBlockSize(signatureGetSigType(buf)) + sizeof(TikCommonBlock)) : 0);
+}
 
 #endif /* __TIK_H__ */

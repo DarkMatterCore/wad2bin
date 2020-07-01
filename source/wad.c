@@ -55,9 +55,10 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     u8 *cert_chain = NULL;
     CertificateChain chain_data = {0};
     
-    u8 *ticket = NULL;
+    Ticket ticket = {0};
     TikCommonBlock *tik_common_block = NULL;
     TmdContentRecord *tmd_contents = NULL;
+    u32 tik_console_id = 0;
     u64 tik_tid = 0;
     
     u8 *tmd = NULL;
@@ -119,7 +120,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
                      ALIGN_UP(wad_header.tmd_size, WAD_BLOCK_SIZE) + ALIGN_UP(wad_header.data_size, WAD_BLOCK_SIZE));
     
     if (wad_header.header_size != WadHeaderSize_InstallablePackage || wad_header.type != WadType_NormalPackage || wad_header.version != WadVersion_InstallablePackage || \
-        !wad_header.cert_chain_size || wad_header.ticket_size < TIK_MIN_SIZE || wad_header.tmd_size < TMD_MIN_SIZE || !wad_header.data_size || wad_size < calc_wad_size)
+        !wad_header.cert_chain_size || wad_header.ticket_size < SIGNED_TIK_MIN_SIZE || wad_header.tmd_size < TMD_MIN_SIZE || !wad_header.data_size || wad_size < calc_wad_size)
     {
         ERROR_MSG("Invalid WAD header in \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
@@ -149,15 +150,14 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     
     /* Read ticket. */
     printf("Ticket:\n");
-    ticket = tikReadTicketFromFile(wad_fd, wad_header.ticket_size);
-    if (!ticket)
+    if (!tikReadTicketFromFile(wad_fd, wad_header.ticket_size, &ticket, &chain_data))
     {
-        ERROR_MSG("Invalid ticket in \"" OS_PRINT_STR "\"!", wad_path);
+        ERROR_MSG("\nInvalid ticket in \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
     }
     
     /* Retrieve ticket common block. */
-    tik_common_block = tikGetCommonBlockFromBuffer(ticket, wad_header.ticket_size, NULL);
+    tik_common_block = tikGetCommonBlock(ticket.data);
     
     /* Generate decrypted titlekey. */
     memcpy(titlekey_iv, (u8*)(&(tik_common_block->title_id)), sizeof(u64));
@@ -187,33 +187,19 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         goto out;
     }
     
-    
-    
-    
-    
-    /* Check if the ticket signature is valid. */
-    /* If not, then we'll need to fakesign the ticket. */
-    
-    
-    
-    
-    
-    if (bswap_32(tik_common_block->console_id) != console_id)
+    /* Check if we need to fakesign the ticket. */
+    tik_console_id = bswap_32(tik_common_block->console_id);
+    if (!ticket.valid_sig || (ticket.valid_sig && tik_console_id > 0 && tik_console_id != console_id))
     {
-        tikFakesignTicket(ticket, wad_header.ticket_size);
+        tikFakesignTicket(&ticket);
         printf("Ticket fakesigned (not issued for target console).\n\n");
+    } else {
+        printf("Ticket signature is valid.\n\n");
     }
-    
-    
-    
-    
-    
-    
-    
     
     /* Save ticket. */
     os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "tik.bin");
-    if (!utilsWriteDataToFile(out_path, ticket, wad_header.ticket_size))
+    if (!utilsWriteDataToFile(out_path, ticket.data, wad_header.ticket_size))
     {
         ERROR_MSG("Failed to save ticket from \"" OS_PRINT_STR "\"!", wad_path);
         goto out;
@@ -361,7 +347,14 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     
     if (save_ticket)
     {
-        *out_tik = ticket;
+        *out_tik = (u8*)calloc(ALIGN_UP(wad_header.ticket_size, WAD_BLOCK_SIZE), sizeof(u8));
+        if (!out_tik)
+        {
+            ERROR_MSG("Unable to allocate memory for output ticket copy!");
+            goto out;
+        }
+        
+        memcpy(*out_tik, ticket.data, wad_header.ticket_size);
         *out_tik_size = wad_header.ticket_size;
     }
     
@@ -377,8 +370,6 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     
 out:
     if (tmd && (!success || (success && !save_tmd))) free(tmd);
-    
-    if (ticket && (!success || (success && !save_ticket))) free(ticket);
     
     certFreeCertificateChain(&chain_data);
     
@@ -483,7 +474,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, u8 *cert_chain, u64
 {
     size_t out_path_len = 0;
     
-    if (!out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || cert_chain_size < SIGNED_CERT_MIN_SIZE || !ticket || ticket_size < TIK_MIN_SIZE || !tmd || tmd_size < TMD_MIN_SIZE)
+    if (!out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || cert_chain_size < SIGNED_CERT_MIN_SIZE || !ticket || ticket_size < SIGNED_TIK_MIN_SIZE || !tmd || tmd_size < TMD_MIN_SIZE)
     {
         ERROR_MSG("Invalid parameters!");
         return false;
