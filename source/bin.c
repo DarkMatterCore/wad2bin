@@ -507,7 +507,7 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid, bool use_null_key)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
@@ -639,7 +639,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         }
         
         /* Write encrypted content file. */
-        write_res = wadWriteUnpackedContentToPackage(indexed_bin, prng_key, cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
+        write_res = wadWriteUnpackedContentToPackage(indexed_bin, (use_null_key ? null_key : prng_key), cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
         if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
         
         /* Close files. */

@@ -6,12 +6,21 @@ Usage:
 --------------
 
 ```
-Usage: %s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]
+wad2bin v0.7 (c) DarkMatterCore.
+Built: 16:57:46 Jul  1 2020.
 
-Paths must not exceed 1023 characters. Relative paths are supported.
+Usage: wad2bin <keys.txt> <device.cert> <input WAD> <output dir> [<parent title ID> [--nullkey]]
+
+Paths must not exceed 259 characters. Relative paths are supported.
 The required directory tree for the *.bin file(s) will be created at the output directory.
 You can set your SD card root directory as the output directory.
-Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
+
+Notes about DLC support:
+* Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
+* If "--nullkey" is set after the parent title ID, a null key will be used to encrypt DLC content data.
+  Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.
+
+For more information, please visit: https://github.com/DarkMatterCore/wad2bin.
 ```
 
 Building instructions:
@@ -43,12 +52,20 @@ Guidelines:
 * Both ticket and TMD for each converted WAD package must be installed on the target Wii console in order for this to work.
     * For this matter, the program generates a bogus WAD package at the provided output directory, using the `<title_id>_bogus.wad` naming convention. It can be used with regular WAD Managers to install both ticket and TMD if needed.
     * Bogus WAD packages don't have any encrypted content data, thus they're expected to return errors like `-1022` during installation with regular WAD Managers - this is expected behaviour, so don't panic.
-    * If you can't get your converted WAD package to work, try "uninstalling" the bogus WAD before installing it. It fixes the problem most of the time.
-* If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it.
-    * Regular Wii consoles: use [Simple IOS Patcher](https://gbatemp.net/download/simple-ios-patcher.25749) to install a patched System Menu IOS (IOS60 for 4.0 and 4.1, IOS70 for 4.2 and IOS80 for 4.3).
-    * Wii U consoles (vWii): use [Patched IOS80 Installer for vWii](https://gbatemp.net/threads/patched-ios80-installer-for-vwii-allows-sd-menu-custom-channels.344882) to install a patched IOS80.
+    * If you can't get your converted WAD package to work, try uninstalling the bogus WAD before installing it (for real). This fixes the problem most of the time.
 * Channel WADs get converted to `content.bin` files, while DLC WADs get converted to `<index>.bin` files.
 * If a DLC WAD is provided, it doesn't matter if it's an uncomplete WAD with missing contents, a WAD with a tampered TMD that only references the packaged contents or a full WAD with all contents: all cases are supported by wad2bin. There's no need to provide any content indexes.
+* DLCs can use a parent title ID that's different from the title ID from the game they belong if other games are capable of using them. That's why a parent title ID is required to convert DLCs.
+* Converted DLC data can be encrypted using either a null key (used by older games) or the console-specific PRNG key (used by newer games, and also old games when launched with a cIOS).
+* If the WAD ticket wasn't issued for the target console, or if the WAD isn't legit (e.g. homebrew WAD), a patched IOS must be installed and used. This varies depending on the converted WAD type:
+    * **Channels:** the IOS used by the System Menu must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it:
+        * **Regular Wii consoles:** use [Simple IOS Patcher](https://gbatemp.net/download/simple-ios-patcher.25749) to install a patched System Menu IOS (IOS60 for 4.0 and 4.1, IOS70 for 4.2 and IOS80 for 4.3).
+        * **Wii U consoles (vWii):** use [Patched IOS80 Installer for vWii](https://gbatemp.net/threads/patched-ios80-installer-for-vwii-allows-sd-menu-custom-channels.344882) to install a patched IOS80.
+    * **DLCs:** the game must be launched using a cIOS, or its required IOS version must be patched to enable the [signing bug](https://wiibrew.org/wiki/Signing_bug) on it. This greatly depends on:
+        * **How old the game is:** if it enforces the usage of a null key when launched through the Disc Channel.
+        * **The used launch method:** cIOS enforce the usage of the PRNG key, even on older games.
+        * **Ticket/TMD signature validity:** if it's not valid, or if the ticket wasn't issued for the target console, a patched IOS or a cIOS will always be necessary.
+        * Because of all these reasons, it's difficult to establish a clear procedure that works for every single case. Further trial and error by the user is encouraged.
 
 Supported DLCs:
 --------------
@@ -65,7 +82,7 @@ The title ID from the parent game must be provided as an additional command line
     * `00010005-735A45xx` (`sZEx`).
     * `00010005-735A46xx` (`sZFx`).
 
-* The Beatles Rock Band (`00010000-52394Axx`) (`R9Jx`):
+* The Beatles: Rock Band (`00010000-52394Axx`) (`R9Jx`):
     * `00010005-72394Axx` (`r9Jx`).
 
 * Rock Band 3 (`00010000-535A42xx`) (`SZBx`):
@@ -132,6 +149,21 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 
 Changelog:
 --------------
+
+**v0.7:**
+
+* Removed parent title ID generation for DLC WADs. This doesn't work properly with games that are capable of using DLCs from other games.
+    * The hardcoded DLC title ID list is still being used as a filter to know if any converted DLCs will work or not.
+* Added support for encrypting converted DLC data with a null key. Fixes issues with older games launched through the Disc Channel, such as `Rock Band 2`.
+    * Please read the guidelines from the readme! Even if a null key is used, a patched IOS is still needed if the DLC ticket wasn't issued for the target console and you intend to launch the game through the Disc Channel.
+* Added `The Beatles: Rock Band` DLC to the hardcoded DLC title ID list.
+* Written content padding is now encrypted as well.
+* Several fixes to the U8 archive parsing code.
+* Fixed a silly `ECSDA` -> `ECDSA` typo.
+* Reworked certificate chain, ticket and TMD handling.
+* Implemented RSA signature verification in certificates, tickets and TMDs.
+    * Fixes a bug where the ticket would have been fakesigned even if it was perfectly valid.
+* Useful info is now displayed at the end of the conversion process. Please read it.
 
 **v0.6:**
 

@@ -89,6 +89,6 @@ bool binIsDlcTitleConvertible(u64 tid);
 bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd);
 
 /// Generates <index>.bin file(s) using an unpacked WAD data directory, TMD data loaded into memory and a parent title ID.
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid);
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid, bool use_null_key);
 
 #endif /* __BIN_H__ */

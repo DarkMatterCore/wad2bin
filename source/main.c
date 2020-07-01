@@ -23,14 +23,15 @@
 #include "keys.h"
 #include "bin.h"
 
-#define ARG_COUNT   4
+#define PATH_COUNT       4
+#define NULL_KEY_ARG    "--nullkey"
 
 int main(int argc, char **argv)
 {
     int ret = 0;
     
     /* Reserve memory for an extra temporary path. */
-    os_char_t *paths[ARG_COUNT + 1] = {0};
+    os_char_t *paths[PATH_COUNT + 1] = {0};
     
     CertificateChain *cert_chain = NULL;
     
@@ -41,18 +42,23 @@ int main(int argc, char **argv)
     
     u64 title_id = 0, parent_tid = 0;
     u32 required_ios = 0, tid_upper = 0;
+    bool use_null_key = false;
     
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
-    if (argc < (ARG_COUNT + 1) || argc > (ARG_COUNT + 2) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || \
-        (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH || (argc == (ARG_COUNT + 2) && strlen(argv[5]) != 16))
+    if (argc < (PATH_COUNT + 1) || argc > (PATH_COUNT + 3) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || \
+        (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH || (argc >= (PATH_COUNT + 2) && strlen(argv[5]) != 16) || (argc == (PATH_COUNT + 3) && (strlen(argv[6]) != strlen(NULL_KEY_ARG) || \
+        strcmp(argv[6], NULL_KEY_ARG) != 0)))
     {
-        printf("Usage: %s <keys file> <device.cert> <input WAD> <output dir> [parent title ID]\n\n", argv[0]);
+        printf("Usage: %s <keys.txt> <device.cert> <input WAD> <output dir> [<parent title ID> [" NULL_KEY_ARG "]]\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
         printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
-        printf("You can set your SD card root directory as the output directory.\n");
-        printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n\n");
+        printf("You can set your SD card root directory as the output directory.\n\n");
+        printf("Notes about DLC support:\n");
+        printf("* Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n");
+        printf("* If \"" NULL_KEY_ARG "\" is set after the parent title ID, a null key will be used to encrypt DLC content data.\n");
+        printf("  Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.\n\n");
         printf("For more information, please visit: https://github.com/DarkMatterCore/wad2bin.\n\n");
         ret = -1;
         goto out;
@@ -70,7 +76,7 @@ int main(int argc, char **argv)
     }
     
     /* Generate path buffers. */
-    for(u32 i = 0; i <= ARG_COUNT; i++)
+    for(u32 i = 0; i <= PATH_COUNT; i++)
     {
         /* Allocate memory for the current path. */
         paths[i] = (os_char_t*)calloc(MAX_PATH, sizeof(os_char_t));
@@ -81,7 +87,7 @@ int main(int argc, char **argv)
             goto out;
         }
         
-        if (i == ARG_COUNT)
+        if (i == PATH_COUNT)
         {
             /* Save temporary path and create it. */
             os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2bin_wad_data");
@@ -104,12 +110,12 @@ int main(int argc, char **argv)
             /* Check if the output directory string ends with a path separator. */
             /* If so, remove it. */
             u64 path_len = strlen(argv[i + 1]);
-            if (i == (ARG_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
+            if (i == (PATH_COUNT - 1) && argv[i + 1][path_len - 1] == *((u8*)OS_PATH_SEPARATOR)) paths[i][path_len - 1] = (os_char_t)0;
         }
     }
     
     /* Check if the user provided a parent title ID. */
-    if (argc == (ARG_COUNT + 2))
+    if (argc >= (PATH_COUNT + 2))
     {
         /* Parse parent title ID. */
         if (!keysParseHexKey((u8*)&parent_tid, NULL, argv[5], 8, false))
@@ -130,6 +136,9 @@ int main(int argc, char **argv)
             ret = -6;
             goto out;
         }
+        
+        /* Enable null key usage if needed. */
+        use_null_key = (argc == (PATH_COUNT + 3));
     }
     
     /* Load keydata and device certificate. */
@@ -160,7 +169,7 @@ int main(int argc, char **argv)
     if (tid_upper == TITLE_TYPE_DLC)
     {
         /* Check if a parent title ID was provided. */
-        if (argc != (ARG_COUNT + 2))
+        if (argc < (PATH_COUNT + 2))
         {
             ERROR_MSG("Error: parent title ID not provided! This is required for DLC titles.\n");
             ret = -9;
@@ -176,7 +185,7 @@ int main(int argc, char **argv)
         }
         
         /* Generate <index>.bin file(s). */
-        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, parent_tid))
+        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, parent_tid, use_null_key))
         {
             ret = -11;
             goto out;
@@ -206,12 +215,32 @@ int main(int argc, char **argv)
         
         if (tid_upper == TITLE_TYPE_DLC)
         {
-            printf("In order to use the converted DLC package, you'll either need to launch the game using a cIOS (NeoGamma, USB Loader),\n");
-            printf("or install a patched IOS%u (if you wish to use the disc channel).\n\n", required_ios);
+            if (use_null_key)
+            {
+                printf("In order to use the converted DLC, you'll need to install a patched IOS%u and launch the game via the Disc Channel.\n", required_ios);
+                printf("The converted DLC won't work if you launch the game using a cIOS (e.g. NeoGamma, USB Loader).\n");
+            } else {
+                printf("In order to use the converted DLC, you'll need to launch the game using a cIOS (NeoGamma, USB Loader),\n");
+                printf("or install a patched IOS%u (if you wish to use the Disc Channel).\n", required_ios);
+            }
         } else {
             printf("You'll need to install a patched System Menu IOS in order to run this channel from the SD card menu.\n\n");
         }
+    } else {
+        printf("Both ticket/TMD signatures are valid.\n");
+        
+        if (tid_upper == TITLE_TYPE_DLC)
+        {
+            printf("This DLC should work right away on your console without having to launch the game using a cIOS, nor having to\n");
+            printf("install a patched IOS%u.\n", required_ios);
+        } else {
+            printf("This channel should work right away on your console without having to install a patched System Menu IOS.\n\n");
+        }
     }
+    
+    if (tid_upper == TITLE_TYPE_DLC) printf("If it doesn't work anyway, try converting the DLC %s \"" NULL_KEY_ARG "\".\n\n", (use_null_key ? "without" : "with"));
+    
+    printf("Remember to install the generated bogus WAD file! If it doesn't work, try uninstalling it first (for real).\n\n");
     
 out:
     if (ret < 0 && ret != -1) printf("Process failed!\n\n");
@@ -237,7 +266,7 @@ out:
     /* Remove unpacked WAD directory. */
     if (paths[4]) utilsRemoveDirectoryRecursively(paths[4]);
     
-    for(u32 i = 0; i <= ARG_COUNT; i++)
+    for(u32 i = 0; i <= PATH_COUNT; i++)
     {
         if (paths[i]) free(paths[i]);
     }
