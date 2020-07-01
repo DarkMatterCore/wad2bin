@@ -168,7 +168,8 @@ typedef struct {
 bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain, u8 **out_raw_chain);
 
 /// Verifies the signature from a signed payload using a previously populated CertificateChain element.
-bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size);
+/// Returns false if there's an error in the signature verification steps. Otherwise, returns true and the result from the signature verification is saved to out_result.
+bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size, bool *out_result);
 
 /// Helper inline functions.
 

@@ -107,9 +107,10 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
     /* Verify certificate signatures. */
     for(u32 i = 0; i < out_chain->count; i++)
     {
+        bool valid_sig = false;
         CertCommonBlock *cert_common_block = certGetCommonBlock(out_chain->certs[i].data);
         
-        if (!certVerifySignatureFromSignedPayload(out_chain, out_chain->certs[i].data, out_chain->certs[i].size))
+        if (!certVerifySignatureFromSignedPayload(out_chain, out_chain->certs[i].data, out_chain->certs[i].size, &valid_sig) || !valid_sig)
         {
             ERROR_MSG("Signature verification failed for certificate \"%s\"!", cert_common_block->name);
             goto out;
@@ -134,7 +135,7 @@ out:
     return success;
 }
 
-bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size)
+bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size, bool *out_result)
 {
     u32 sig_type = 0;
     u8 *signature = NULL;
@@ -150,7 +151,7 @@ bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_
     u64 cert_name_len = 0, cert_pub_key_size = 0;
     bool valid_sig = false;
     
-    if (!chain || !chain->count || !chain->certs || !signed_payload || !signed_payload_size || !(payload = (u8*)signatureGetPayload(signed_payload)))
+    if (!chain || !chain->count || !chain->certs || !signed_payload || !signed_payload_size || !out_result || !(payload = (u8*)signatureGetPayload(signed_payload)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
@@ -169,7 +170,11 @@ bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_
     }
     
     /* Skip signature verification if we're dealing with a HMAC signature or a signature issued by Root. */
-    if (sig_type == SignatureType_Hmac160Sha1 || (strlen((char*)payload) == 4 && !strcmp((char*)payload, "Root"))) return true;
+    if (sig_type == SignatureType_Hmac160Sha1 || (strlen((char*)payload) == 4 && !strcmp((char*)payload, "Root")))
+    {
+        *out_result = true;
+        return true;
+    }
     
     /* Get pointer to the certificate name. */
     cert_name = strrchr((char*)payload, '-');
@@ -251,7 +256,9 @@ bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_
             break;
     }
     
-    return valid_sig;
+    *out_result = valid_sig;
+    
+    return true;
 }
 
 static bool certGetCertificateTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size)
