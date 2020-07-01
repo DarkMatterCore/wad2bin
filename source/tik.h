@@ -27,8 +27,10 @@
 #include "cert.h"
 #include "crypto.h"
 
-#define SIGNED_TIK_MAX_SIZE    (u64)sizeof(TikSigRsa4096)
-#define SIGNED_TIK_MIN_SIZE    (u64)sizeof(TikSigHmac160)
+#define SIGNED_TIK_MAX_SIZE         (u64)sizeof(TikSigRsa4096)
+#define SIGNED_TIK_MIN_SIZE         (u64)sizeof(TikSigHmac160)
+
+#define TIK_COMMON_KEY_INDEX_STR(x) ((x) == TikCommonKeyIndex_Korean ? "Korean" : ((x) == TikCommonKeyIndex_vWii ? "vWii" : "Normal"))
 
 typedef enum {
     TikType_None        = 0,
@@ -101,19 +103,23 @@ typedef struct {
     u8 type;                        ///< TikType.
     u64 size;                       ///< Raw ticket size.
     bool valid_sig;                 ///< Determines if the ticket signature is valid or not.
-    u8 data[SIGNED_TIK_MAX_SIZE];   ///< Raw ticket data.
+    u8 *data;                       ///< Raw ticket data.
 } Ticket;
 
 /// Reads a ticket from a file and validates its signature.
 bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, CertificateChain *chain);
 
-/// Checks the Title ID from a ticket common block to determine if the title is exportable.
-bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
-
 /// Fakesigns a ticket.
 void tikFakesignTicket(Ticket *ticket);
 
 /// Helper inline functions.
+
+ALWAYS_INLINE void tikFreeTicket(Ticket *ticket)
+{
+    if (!ticket) return;
+    if (ticket->data) free(ticket->data);
+    memset(ticket, 0, sizeof(Ticket));
+}
 
 ALWAYS_INLINE TikCommonBlock *tikGetCommonBlock(void *buf)
 {

@@ -102,7 +102,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     }
     
     /* Allocate memory for the U8 nodes. */
-    nodes = calloc(node_count, sizeof(U8Node));
+    nodes = (U8Node*)calloc(node_count, sizeof(U8Node));
     if (!nodes)
     {
         ERROR_MSG("Error allocating memory for U8 nodes!");
@@ -119,7 +119,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     }
     
     /* Allocate memory for the U8 string table. */
-    str_table = calloc(str_table_size, sizeof(char));
+    str_table = (char*)calloc(str_table_size, sizeof(char));
     if (!str_table)
     {
         ERROR_MSG("Error allocating memory for U8 string table!");
@@ -340,7 +340,7 @@ u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, u64 *out_size)
     u64 res = 0;
     
     /* Allocate memory for the file buffer. */
-    buf = malloc(file_node->size);
+    buf = (u8*)malloc(file_node->size);
     if (!buf)
     {
         ERROR_MSG("Error allocating memory for file buffer!");

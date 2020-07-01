@@ -28,7 +28,7 @@
 
 static bool certGetCertificateTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size);
 
-bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain, u8 **out_raw_chain)
+bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain)
 {
     if (!fd || cert_chain_size < SIGNED_CERT_MIN_SIZE || !out_chain)
     {
@@ -36,7 +36,6 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
         return false;
     }
     
-    u8 *raw_chain = NULL;
     u64 res = 0, offset = 0;
     Certificate *tmp_certs = NULL;
     
@@ -46,20 +45,22 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
     memset(out_chain, 0, sizeof(CertificateChain));
     
     /* Allocate memory for the raw certificate chain. */
-    raw_chain = calloc(ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE), sizeof(u8));
-    if (!raw_chain)
+    out_chain->raw_chain = (u8*)calloc(ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE), sizeof(u8));
+    if (!out_chain->raw_chain)
     {
-        ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes raw certificate chain buffer!", cert_chain_size);
+        ERROR_MSG("Error allocating 0x%" PRIx64 " bytes raw certificate chain buffer!", cert_chain_size);
         return false;
     }
     
     /* Read raw certificate chain. */
-    res = fread(raw_chain, 1, cert_chain_size, fd);
+    res = fread(out_chain->raw_chain, 1, cert_chain_size, fd);
     if (res != cert_chain_size)
     {
         ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long raw certificate chain!", cert_chain_size);
         goto out;
     }
+    
+    out_chain->raw_chain_size = cert_chain_size;
     
     /* Check each certificate in the chain. */
     while(offset < cert_chain_size && (cert_chain_size - offset) >= SIGNED_CERT_MIN_SIZE)
@@ -80,14 +81,14 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
         /* Get certificate type and size. */
         printf("Certificate #%u:\n", out_chain->count + 1);
         
-        if (!certGetCertificateTypeAndSize(raw_chain + offset, cert_chain_size, &(out_chain->certs[out_chain->count].type), &(out_chain->certs[out_chain->count].size)))
+        if (!certGetCertificateTypeAndSize(out_chain->raw_chain + offset, cert_chain_size, &(out_chain->certs[out_chain->count].type), &(out_chain->certs[out_chain->count].size)))
         {
             ERROR_MSG("Invalid certificate detected in chain!");
             goto out;
         }
         
         /* Update new certificate entry. */
-        memcpy(out_chain->certs[out_chain->count].data, raw_chain + offset, out_chain->certs[out_chain->count].size);
+        memcpy(out_chain->certs[out_chain->count].data, out_chain->raw_chain + offset, out_chain->certs[out_chain->count].size);
         offset += out_chain->certs[out_chain->count].size;
         out_chain->count++;
     }
@@ -121,16 +122,6 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
     
 out:
     if (!success) certFreeCertificateChain(out_chain);
-    
-    if (raw_chain)
-    {
-        if (success && out_raw_chain)
-        {
-            *out_raw_chain = raw_chain;
-        } else {
-            free(raw_chain);
-        }
-    }
     
     return success;
 }
@@ -270,19 +261,22 @@ static bool certGetCertificateTypeAndSize(void *buf, u64 buf_size, u8 *out_type,
     
     if (!buf || buf_size < SIGNED_CERT_MIN_SIZE || (!out_type && !out_size))
     {
-        ERROR_MSG("\nInvalid parameters!");
+        printf("\n");
+        ERROR_MSG("Invalid parameters!");
         return false;
     }
     
     if (!(cert_common_block = certGetCommonBlock(buf)) || !(signed_cert_size = certGetSignedCertificateSize(buf)))
     {
-        ERROR_MSG("\nInput buffer doesn't hold a valid signed certificate!");
+        printf("\n");
+        ERROR_MSG("Input buffer doesn't hold a valid signed certificate!");
         return false;
     }
     
     if (signed_cert_size > buf_size)
     {
-        ERROR_MSG("\nCalculated signed certificate size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_cert_size, buf_size);
+        printf("\n");
+        ERROR_MSG("Calculated signed certificate size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_cert_size, buf_size);
         return false;
     }
     

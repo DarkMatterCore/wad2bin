@@ -206,10 +206,10 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)
         
         /* Allocate memory for the current entry name. */
         entry_len = (path_len + 1 + entry_len + 1);
-        name_buf = calloc(entry_len, sizeof(os_char_t));
+        name_buf = (os_char_t*)calloc(entry_len, sizeof(os_char_t));
         if (!name_buf)
         {
-            ERROR_MSG("Failed to allocate memory for entry name buffer!");
+            ERROR_MSG("Error allocating memory for entry name buffer!");
             success = false;
             break;
         }

@@ -32,17 +32,15 @@ int main(int argc, char **argv)
     /* Reserve memory for an extra temporary path. */
     os_char_t *paths[ARG_COUNT + 1] = {0};
     
-    u8 *cert_chain = NULL;
-    u64 cert_chain_size = 0;
+    CertificateChain *cert_chain = NULL;
     
-    u8 *ticket = NULL;
-    u64 ticket_size = 0;
+    Ticket *ticket = NULL;
     
-    u8 *tmd = NULL;
-    u64 tmd_size = 0;
+    TitleMetadata *tmd = NULL;
+    TmdCommonBlock *tmd_common_block = NULL;
     
     u64 title_id = 0, parent_tid = 0;
-    u32 tid_upper = 0;
+    u32 required_ios = 0, tid_upper = 0;
     
     printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
@@ -60,15 +58,26 @@ int main(int argc, char **argv)
         goto out;
     }
     
+    /* Allocate memory for the certificate chain, ticket and TMD. */
+    cert_chain = (CertificateChain*)calloc(1, sizeof(CertificateChain));
+    ticket = (Ticket*)calloc(1, sizeof(Ticket));
+    tmd = (TitleMetadata*)calloc(1, sizeof(TitleMetadata));
+    if (!cert_chain || !ticket || !tmd)
+    {
+        ERROR_MSG("Error allocating memory for certificate chain / ticket / TMD structs!");
+        ret = -2;
+        goto out;
+    }
+    
     /* Generate path buffers. */
     for(u32 i = 0; i <= ARG_COUNT; i++)
     {
         /* Allocate memory for the current path. */
-        paths[i] = calloc(MAX_PATH, sizeof(os_char_t));
+        paths[i] = (os_char_t*)calloc(MAX_PATH, sizeof(os_char_t));
         if (!paths[i])
         {
             ERROR_MSG("Error allocating memory for path #%u!", i);
-            ret = -2;
+            ret = -3;
             goto out;
         }
         
@@ -84,7 +93,7 @@ int main(int argc, char **argv)
             if (!utilsConvertUTF8ToUTF16(paths[i], argv[i + 1]))
             {
                 ERROR_MSG("Failed to convert path from UTF-8 to UTF-16!");
-                ret = -3;
+                ret = -4;
                 goto out;
             }
 #else
@@ -105,8 +114,8 @@ int main(int argc, char **argv)
         /* Parse parent title ID. */
         if (!keysParseHexKey((u8*)&parent_tid, NULL, argv[5], 8, false))
         {
-            printf("Failed to parse parent title ID!\n");
-            ret = -4;
+            ERROR_MSG("Failed to parse parent title ID!\n");
+            ret = -5;
             goto out;
         }
         
@@ -117,8 +126,8 @@ int main(int argc, char **argv)
         u32 parent_tid_upper = TITLE_UPPER(parent_tid);
         if (parent_tid_upper != TITLE_TYPE_DISC_GAME && parent_tid_upper != TITLE_TYPE_DOWNLOADABLE_CHANNEL && parent_tid_upper != TITLE_TYPE_DISC_BASED_CHANNEL)
         {
-            printf("Invalid parent title ID category!\nOnly disc-based game IDs, downloadable channel IDs and disc-based channel IDs are supported.\n");
-            ret = -5;
+            ERROR_MSG("Invalid parent title ID category! (%08" PRIx32 ").\nOnly disc-based game IDs, downloadable channel IDs and disc-based channel IDs are supported.\n", parent_tid_upper);
+            ret = -6;
             goto out;
         }
     }
@@ -126,20 +135,25 @@ int main(int argc, char **argv)
     /* Load keydata and device certificate. */
     if (!keysLoadKeyDataAndDeviceCert(paths[0], paths[1]))
     {
-        ret = -6;
+        ret = -7;
         goto out;
     }
     
     printf("Keydata and device certificate successfully loaded.\n\n");
     
     /* Unpack input WAD package. */
-    if (!wadUnpackInstallablePackage(paths[2], paths[4], &cert_chain, &cert_chain_size, &ticket, &ticket_size, &tmd, &tmd_size, &title_id))
+    if (!wadUnpackInstallablePackage(paths[2], paths[4], cert_chain, ticket, tmd))
     {
-        ret = -7;
+        ret = -8;
         goto out;
     }
     
     printf("WAD package \"" OS_PRINT_STR "\" successfully unpacked.\n\n", paths[2]);
+    
+    /* Get TMD common block and retrieve the title ID and required system version. */
+    tmd_common_block = tmdGetCommonBlock(tmd->data);
+    title_id = bswap_64(tmd_common_block->title_id);
+    required_ios = TITLE_LOWER(bswap_64(tmd_common_block->system_version));
     
     /* Start conversion process. */
     tid_upper = TITLE_UPPER(title_id);
@@ -148,51 +162,77 @@ int main(int argc, char **argv)
         /* Check if a parent title ID was provided. */
         if (argc != (ARG_COUNT + 2))
         {
-            printf("Error: parent title ID not provided! This is required for DLC titles.\n");
-            ret = -8;
+            ERROR_MSG("Error: parent title ID not provided! This is required for DLC titles.\n");
+            ret = -9;
             goto out;
         }
         
         /* Check if we're dealing with a DLC that can be converted. */
         if (!binIsDlcTitleConvertible(title_id))
         {
-            printf("This DLC package belongs to a game that doesn't support the <index>.bin format!\nConversion process halted.\n");
-            ret = -9;
+            ERROR_MSG("This DLC package belongs to a game that doesn't support the <index>.bin format!\nConversion process halted.\n");
+            ret = -10;
             goto out;
         }
         
         /* Generate <index>.bin file(s). */
-        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size, parent_tid))
+        if (!binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, parent_tid))
         {
-            ret = -10;
+            ret = -11;
             goto out;
         }
     } else {
         /* Generate content.bin file. */
-        if (!binGenerateContentBinFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd, tmd_size))
+        if (!binGenerateContentBinFromUnpackedInstallableWadPackage(paths[4], paths[3], tmd))
         {
-            ret = -11;
+            ret = -12;
             goto out;
         }
     }
     
     /* Generate bogus installable WAD package. */
-    if (!wadGenerateBogusInstallablePackage(paths[3], cert_chain, cert_chain_size, ticket, ticket_size, tmd, tmd_size))
+    if (!wadGenerateBogusInstallablePackage(paths[3], cert_chain, ticket, tmd))
     {
-        ret = -12;
+        ret = -13;
         goto out;
     }
     
     printf("Process finished!\n\n");
     
+    /* Print message about needing a patched IOS. */
+    if (!ticket->valid_sig || !tmd->valid_sig)
+    {
+        printf("The signature from the ticket/TMD in the provided WAD package isn't valid.\n");
+        
+        if (tid_upper == TITLE_TYPE_DLC)
+        {
+            printf("In order to use the converted DLC package, you'll either need to launch the game using a cIOS (NeoGamma, USB Loader),\n");
+            printf("or install a patched IOS%u (if you wish to use the disc channel).\n\n", required_ios);
+        } else {
+            printf("You'll need to install a patched System Menu IOS in order to run this channel from the SD card menu.\n\n");
+        }
+    }
+    
 out:
     if (ret < 0 && ret != -1) printf("Process failed!\n\n");
     
-    if (tmd) free(tmd);
+    if (tmd)
+    {
+        tmdFreeTitleMetadata(tmd);
+        free(tmd);
+    }
     
-    if (ticket) free(ticket);
+    if (ticket)
+    {
+        tikFreeTicket(ticket);
+        free(ticket);
+    }
     
-    if (cert_chain) free(cert_chain);
+    if (cert_chain)
+    {
+        certFreeCertificateChain(cert_chain);
+        free(cert_chain);
+    }
     
     /* Remove unpacked WAD directory. */
     if (paths[4]) utilsRemoveDirectoryRecursively(paths[4]);

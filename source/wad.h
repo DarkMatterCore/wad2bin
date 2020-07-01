@@ -24,6 +24,8 @@
 #ifndef __WAD_H__
 #define __WAD_H__
 
+#include "cert.h"
+#include "tik.h"
 #include "tmd.h"
 
 #define WAD_HEADER_SIZE_STR(x)  ((x) == WadHeaderSize_InstallablePackage ? "InstallablePackage" : ((x) == WadHeaderSize_BackupPackage ? "BackupPackage" : "Unknown"))
@@ -81,14 +83,13 @@ typedef struct {
 /// Unpacks an installable WAD package to a destination directory.
 /// If valid pointers are provided, certificate chain data, ticket data and/or TMD data may be saved to them.
 /// Footer data won't be unpacked.
-bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, u8 **out_cert_chain, u64 *out_cert_chain_size, u8 **out_tik, u64 *out_tik_size, u8 **out_tmd, \
-                                 u64 *out_tmd_size, u64 *out_tid);
+bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, CertificateChain *out_cert_chain, Ticket *out_ticket, TitleMetadata *out_tmd);
 
 /// Writes an unpacked content to a WAD package using file descriptors.
 bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, u64 cnt_size, u64 *out_aligned_cnt_size);
 
 /// Generates a bogus installable WAD package with no content data.
-bool wadGenerateBogusInstallablePackage(os_char_t *out_path, u8 *cert_chain, u64 cert_chain_size, u8 *ticket, u64 ticket_size, u8 *tmd, u64 tmd_size);
+bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd);
 
 /// Byteswaps fields from an installable WAD package.
 ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePackageHeader *wad_header)

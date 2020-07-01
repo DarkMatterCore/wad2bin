@@ -158,14 +158,15 @@ typedef struct {
 
 /// Used to store two or more certificates.
 typedef struct {
-    u32 count;
-    Certificate *certs;
+    u8 *raw_chain;      ///< Raw certificate chain.
+    u64 raw_chain_size; ///< Raw certificate chain size.
+    u32 count;          ///< Certificate count.
+    Certificate *certs; ///< Individual certificate info.
 } CertificateChain;
 
 /// Reads a certificate chain from a file and validates all signatures (whenever possible).
 /// A CertificateChain element is filled with the data from all read certificates.
-/// Optionally, a pointer to the raw certificate chain can be returned if a valid out_raw_chain pointer is provided.
-bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain, u8 **out_raw_chain);
+bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain);
 
 /// Verifies the signature from a signed payload using a previously populated CertificateChain element.
 /// Returns false if there's an error in the signature verification steps. Otherwise, returns true and the result from the signature verification is saved to out_result.
@@ -173,11 +174,12 @@ bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_
 
 /// Helper inline functions.
 
-ALWAYS_INLINE void certFreeCertificateChain(CertificateChain *cert_chain)
+ALWAYS_INLINE void certFreeCertificateChain(CertificateChain *chain)
 {
-    if (!cert_chain) return;
-    if (cert_chain->certs) free(cert_chain->certs);
-    memset(cert_chain, 0, sizeof(CertificateChain));
+    if (!chain) return;
+    if (chain->raw_chain) free(chain->raw_chain);
+    if (chain->certs) free(chain->certs);
+    memset(chain, 0, sizeof(CertificateChain));
 }
 
 ALWAYS_INLINE CertCommonBlock *certGetCommonBlock(void *buf)

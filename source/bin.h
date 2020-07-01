@@ -26,7 +26,6 @@
 
 #include "wad.h"
 #include "crypto.h"
-#include "cert.h"
 
 #define IMET_MAGIC              (u32)0x494D4554         /* "IMET". */
 #define IMET_HASHED_AREA_SIZE   (u32)0x600
@@ -87,9 +86,9 @@ typedef struct {
 bool binIsDlcTitleConvertible(u64 tid);
 
 /// Generates a content.bin file using an unpacked WAD data directory and TMD data loaded into memory.
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size);
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd);
 
 /// Generates <index>.bin file(s) using an unpacked WAD data directory, TMD data loaded into memory and a parent title ID.
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid);
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid);
 
 #endif /* __BIN_H__ */

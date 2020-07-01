@@ -33,43 +33,50 @@ bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, Certif
     }
     
     u64 res = 0;
+    bool success = false;
     
     /* Cleanup output ticket. */
     memset(out_ticket, 0, sizeof(Ticket));
+    
+    /* Allocate memory for the output ticket. */
+    out_ticket->data = (u8*)calloc(ALIGN_UP(ticket_size, WAD_BLOCK_SIZE), sizeof(u8));
+    if (!out_ticket->data)
+    {
+        ERROR_MSG("Error allocating memory for the ticket!");
+        return false;
+    }
     
     /* Read ticket. */
     res = fread(out_ticket->data, 1, ticket_size, fd);
     if (res != ticket_size)
     {
         ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long ticket!", ticket_size);
-        return false;
+        goto out;
     }
     
     /* Check if the ticket size is valid. */
-    if (!tikGetTicketTypeAndSize(out_ticket->data, ticket_size, &(out_ticket->type), &(out_ticket->size))) return false;
+    if (!tikGetTicketTypeAndSize(out_ticket->data, ticket_size, &(out_ticket->type), &(out_ticket->size))) goto out;
     
     if (ticket_size != out_ticket->size)
     {
-        ERROR_MSG("\nCalculated ticket size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", out_ticket->size, ticket_size);
-        return false;
+        printf("\n");
+        ERROR_MSG("Calculated ticket size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", out_ticket->size, ticket_size);
+        goto out;
     }
     
     /* Verify ticket signature. */
     if (!certVerifySignatureFromSignedPayload(chain, out_ticket->data, out_ticket->size, &(out_ticket->valid_sig)))
     {
         ERROR_MSG("Failed to verify ticket signature!");
-        return false;
+        goto out;
     }
     
-    return true;
-}
-
-bool tikIsTitleExportable(TikCommonBlock *tik_common_block)
-{
-    if (!tik_common_block) return false;
-    u64 title_id = bswap_64(tik_common_block->title_id);
-    u32 tid_upper = TITLE_UPPER(title_id);
-    return (tid_upper == TITLE_TYPE_DOWNLOADABLE_CHANNEL || tid_upper == TITLE_TYPE_DISC_BASED_CHANNEL || tid_upper == TITLE_TYPE_DLC);
+    success = true;
+    
+out:
+    if (!success) tikFreeTicket(out_ticket);
+    
+    return success;
 }
 
 void tikFakesignTicket(Ticket *ticket)
@@ -89,7 +96,7 @@ void tikFakesignTicket(Ticket *ticket)
     /* Wipe signature. */
     sig_type = signatureGetSigType(ticket->data);
     signature = signatureGetSig(ticket->data);
-    signature_size = signatureGetSigSize(signatureGetSigType(ticket->data));
+    signature_size = signatureGetSigSize(sig_type);
     memset(signature, 0, signature_size);
     
     /* Wipe ECDH data and console ID. */
@@ -123,6 +130,9 @@ void tikFakesignTicket(Ticket *ticket)
         
         if (hash[0] == 0) break;
     }
+    
+    /* Update signature validity. */
+    ticket->valid_sig = false;
 }
 
 static bool tikGetTicketTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size)
@@ -140,13 +150,15 @@ static bool tikGetTicketTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *
     
     if (!(tik_common_block = tikGetCommonBlock(buf)) || !(signed_ticket_size = tikGetSignedTicketSize(buf)))
     {
-        ERROR_MSG("\nInput buffer doesn't hold a valid signed ticket!");
+        printf("\n");
+        ERROR_MSG("Input buffer doesn't hold a valid signed ticket!");
         return false;
     }
     
     if (signed_ticket_size > buf_size)
     {
-        ERROR_MSG("\nCalculated signed ticket size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_ticket_size, buf_size);
+        printf("\n");
+        ERROR_MSG("Calculated signed ticket size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_ticket_size, buf_size);
         return false;
     }
     

@@ -42,7 +42,7 @@ static const u32 g_supportedDLCs[] = {
     0x735A4500, /* "sZEx" (DLC5). */
     0x735A4600, /* "sZFx" (DLC6). */
     
-    /* The Beatles Rock Band ("R9Jx"). */
+    /* The Beatles: Rock Band ("R9Jx"). */
     0x72394A00, /* "r9Jx". */
     
     /* Rock Band 3 ("SZBx"). */
@@ -100,19 +100,20 @@ bool binIsDlcTitleConvertible(u64 tid)
     return false;
 }
 
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size)
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd_size)
+    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd->size || !tmd->data || \
+        !(tmd_common_block = tmdGetCommonBlock(tmd->data)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
-    TmdCommonBlock *tmd_common_block = NULL;
+    u64 aligned_tmd_size = ALIGN_UP(tmd->size, WAD_BLOCK_SIZE);
     TmdContentRecord *tmd_contents = NULL;
     
     u16 content_count = 0;
@@ -149,10 +150,9 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     
     bool success = false;
     
-    /* Retrieve TMD common block, contents and content count. */
-    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
-    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    /* Retrieve TMD content count and content records. */
     content_count = bswap_16(tmd_common_block->content_count);
+    tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);
     
     /* Retrieve required keydata. */
     console_id = keysGetConsoleId();
@@ -325,7 +325,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     bk_header.type = (u16)WadType_BackupPackage;
     bk_header.version = (u16)WadVersion_BackupPackage;
     bk_header.console_id = console_id;
-    bk_header.content_tmd_size = (u32)tmd_size;
+    bk_header.content_tmd_size = (u32)tmd->size;
     
     /* Calculate content data size and generate the included contents bitfield. */
     for(u16 i = 0; i < content_count; i++)
@@ -369,7 +369,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     mbedtls_sha1_update(&sha1_ctx, (u8*)&bk_header, sizeof(WadBackupPackageHeader));
     
     /* Write plaintext TMD (Part D). */
-    res = fwrite(tmd, 1, aligned_tmd_size, content_bin);
+    res = fwrite(tmd->data, 1, aligned_tmd_size, content_bin);
     if (res != aligned_tmd_size)
     {
         ERROR_MSG("Failed to write plaintext TMD (Part D) to \"" OS_PRINT_STR "\"!", out_path);
@@ -377,7 +377,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     }
     
     /* Update SHA-1 hash calculation. */
-    mbedtls_sha1_update(&sha1_ctx, tmd, aligned_tmd_size);
+    mbedtls_sha1_update(&sha1_ctx, tmd->data, aligned_tmd_size);
     
     /* Process content files (Part E). */
     printf("content.bin content data (Part E):\n");
@@ -507,19 +507,20 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd_size)
+    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd->size || !tmd->data || \
+        !(tmd_common_block = tmdGetCommonBlock(tmd->data)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
-    TmdCommonBlock *tmd_common_block = NULL;
+    u64 aligned_tmd_size = ALIGN_UP(tmd->size, WAD_BLOCK_SIZE);
     TmdContentRecord *tmd_contents = NULL;
     
     u16 content_count = 0;
@@ -537,10 +538,9 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     
     bool success = false;
     
-    /* Retrieve TMD common block, contents and content count. */
-    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
-    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    /* Retrieve TMD content count and content records. */
     content_count = bswap_16(tmd_common_block->content_count);
+    tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);
     
     /* Retrieve required keydata. */
     console_id = keysGetConsoleId();
@@ -596,7 +596,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         bk_header.type = (u16)WadType_BackupPackage;
         bk_header.version = (u16)WadVersion_BackupPackage;
         bk_header.console_id = console_id;
-        bk_header.content_tmd_size = (u32)tmd_size;
+        bk_header.content_tmd_size = (u32)tmd->size;
         bk_header.content_data_size = (u32)ALIGN_UP(cnt_size, WAD_BLOCK_SIZE);
         bk_header.backup_area_size = (u32)(sizeof(WadBackupPackageHeader) + aligned_tmd_size + bk_header.content_data_size);
         memset(bk_header.included_contents, 0, sizeof(bk_header.included_contents));
@@ -629,7 +629,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         }
         
         /* Write plaintext TMD. */
-        res = fwrite(tmd, 1, aligned_tmd_size, indexed_bin);
+        res = fwrite(tmd->data, 1, aligned_tmd_size, indexed_bin);
         if (res != aligned_tmd_size)
         {
             fclose(indexed_bin);
