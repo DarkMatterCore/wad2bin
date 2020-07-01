@@ -57,7 +57,7 @@ typedef struct {
     char issuer[0x40];
     u32 pub_key_type;   ///< CertPubKeyType. Stored using big endian byte order.
     char name[0x40];
-    u32 date;
+    u32 date;           ///< Stored using big endian byte order.
 } CertCommonBlock;
 
 typedef struct {
@@ -167,15 +167,17 @@ typedef struct {
 /// Optionally, a pointer to the raw certificate chain can be returned if a valid out_raw_chain pointer is provided.
 bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain, u8 **out_raw_chain);
 
-/// Frees a populated CertificateChain element.
+/// Verifies the signature from a signed payload using a previously populated CertificateChain element.
+bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size);
+
+/// Helper inline functions.
+
 ALWAYS_INLINE void certFreeCertificateChain(CertificateChain *cert_chain)
 {
     if (!cert_chain) return;
     if (cert_chain->certs) free(cert_chain->certs);
     memset(cert_chain, 0, sizeof(CertificateChain));
 }
-
-/// Helper inline functions.
 
 ALWAYS_INLINE CertCommonBlock *certGetCommonBlock(void *buf)
 {
@@ -189,7 +191,7 @@ ALWAYS_INLINE bool certIsValidPublicKeyType(u32 type)
 
 ALWAYS_INLINE u8 *certGetPublicKey(CertCommonBlock *cert_common_block)
 {
-    return ((cert_common_block && certIsValidPublicKeyType(bswap_32(cert_common_block->pub_key_type))) ? ((u8*)cert_common_block + sizeof(CertCommonBlock)) : NULL);
+    return ((cert_common_block != NULL && certIsValidPublicKeyType(bswap_32(cert_common_block->pub_key_type))) ? ((u8*)cert_common_block + sizeof(CertCommonBlock)) : NULL);
 }
 
 ALWAYS_INLINE u64 certGetPublicKeySize(u32 type)
@@ -208,9 +210,8 @@ ALWAYS_INLINE u64 certGetPublicKeyBlockSize(u32 type)
 
 ALWAYS_INLINE u32 certGetPublicExponent(CertCommonBlock *cert_common_block)
 {
-    if (!cert_common_block) return 0;
-    u32 pub_key_type = bswap_32(cert_common_block->pub_key_type);
-    return bswap_32(*((u32*)(certGetPublicKey(cert_common_block) + certGetPublicKeySize(pub_key_type))));
+    u8 *public_key = certGetPublicKey(cert_common_block);
+    return ((cert_common_block != NULL && public_key != NULL) ? bswap_32(*((u32*)(public_key + certGetPublicKeySize(bswap_32(cert_common_block->pub_key_type))))) : 0);
 }
 
 ALWAYS_INLINE bool certIsValidCertificate(void *buf)
@@ -222,9 +223,8 @@ ALWAYS_INLINE bool certIsValidCertificate(void *buf)
 ALWAYS_INLINE u64 certGetSignedCertificateSize(void *buf)
 {
     if (!certIsValidCertificate(buf)) return 0;
-    u32 sig_type = signatureGetSigType(buf);
     CertCommonBlock *cert_common_block = certGetCommonBlock(buf);
-    return (signatureGetBlockSize(sig_type) + (u64)sizeof(CertCommonBlock) + certGetPublicKeyBlockSize(bswap_32(cert_common_block->pub_key_type)));
+    return (signatureGetBlockSize(signatureGetSigType(buf)) + (u64)sizeof(CertCommonBlock) + certGetPublicKeyBlockSize(bswap_32(cert_common_block->pub_key_type)));
 }
 
 ALWAYS_INLINE u64 certGetSignedCertificateHashAreaSize(void *buf)

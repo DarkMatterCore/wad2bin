@@ -80,6 +80,7 @@ void cryptoGenerateEcdsaSignature(const void *private_key, void *dst, bool padde
 /// Verifies an ECDSA signature using the provided ECC public key and a variable length hash.
 /// Takes care of padding the input public key.
 /// If padded_sig is false, the input signature will be padded with leading zeroes before each coordinate.
+/// data_hash must point to a buffer with a size of at least data_hash_size.
 bool cryptoVerifyEcdsaSignature(const void *public_key, const void *signature, bool padded_sig, const void *data_hash, u64 data_hash_size);
 
 /// Generates an ECC shared secret using an input ECC private key.
@@ -89,6 +90,7 @@ void cryptoGenerateEccPublicKey(const void *private_key, void *dst);
 
 /// Verifies a RSA-2048 or RSA-4906 signature using the provided RSA public key (modulus) and public exponent, as well as a variable length hash.
 /// public_key_size must be set to either RSA2048_SIG_SIZE or RSA4096_SIG_SIZE, and signature must point to a buffer with a size of at least public_key_size.
+/// data_hash_size must be set to either SHA1_HASH_SIZE or SHA256_HASH_SIZE, and data_hash must point to a buffer with a size of at least data_hash_size.
 bool cryptoVerifyRsaSignature(const void *public_key, u64 public_key_size, u64 public_exponent, const void *signature, const void *data_hash, u64 data_hash_size);
 
 #endif /* __CRYPTO_H__ */

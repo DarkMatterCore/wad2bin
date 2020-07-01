@@ -55,6 +55,7 @@ int main(int argc, char **argv)
         printf("The required directory tree for the *.bin file(s) will be created at the output directory.\n");
         printf("You can set your SD card root directory as the output directory.\n");
         printf("Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n\n");
+        printf("For more information, please visit: https://github.com/DarkMatterCore/wad2bin.\n\n");
         ret = -1;
         goto out;
     }
