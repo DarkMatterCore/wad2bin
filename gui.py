@@ -443,7 +443,7 @@ class gui(tk.Tk):
 				execlist = [script, keys, cert, wad, sd]
 				if tid:
 					execlist.append(tid)
-					if self.use_nullkey:
+					if self.use_nullkey.get():
 						execlist.append("--nullkey")
 				self.threader.do_async(execute_script, [execlist, self.output_to_console])
 				self.threader.join() #Wait til complete to start next
