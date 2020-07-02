@@ -417,7 +417,7 @@ class gui(tk.Tk):
 
 		keys = self.keys_box.get().strip()
 		if not keys:
-			self.output_to_console("No keys.bin provided, this can be dumped from your Wii\n")
+			self.output_to_console("No keys.txt provided, this can be dumped from your Wii\n")
 			return
 		if len(keys) > 259:
 			self.output_to_console("Keys file path too long, must be less than 259 characters")
