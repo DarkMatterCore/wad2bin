@@ -476,6 +476,7 @@ class gui(tk.Tk):
 		self.add_folder_button.configure(state = "disable")
 		self.remove_button.configure(state = "disable")
 		self.run_button.configure(state = "disable")
+		self.tid_box.configure(state = "disable")
 
 	def enable(self):
 		self.path_box.configure(state = "normal")
@@ -486,6 +487,7 @@ class gui(tk.Tk):
 		self.add_folder_button.configure(state = "normal")
 		self.remove_button.configure(state = "normal")
 		self.run_button.configure(state = "normal")
+		self.tid_box.configure(state = "normal")
 
 
 def execute_script(args, printer):
