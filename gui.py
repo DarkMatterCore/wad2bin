@@ -347,21 +347,28 @@ class gui(tk.Tk):
 * If "--nullkey" is set after the parent title ID, a null key will be used to encrypt DLC content data.
   Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.""")
 
+		self.use_nullkey = tk.IntVar()
+		self.nullkey_checkbutton = tk.Checkbutton(outer_frame, text="Use nullkey? (only affects DLC)",
+												   variable=self.use_nullkey, background=style.BACKGROUND_COLOR,
+												   foreground=style.LABEL_COLOR, borderwidth=0, highlightthickness=0)
+		self.nullkey_checkbutton.place(relwidth=1, y=115, height=20)
+		CreateToolTip(self.nullkey_checkbutton, "Sets nullkey, some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.")
+
 		# -------------------------------------------------
 		container = themedFrame(outer_frame, borderwidth=0, highlightthickness=0)
-		container.place(y=115, relwidth=1, height=140)
+		container.place(y=135, relwidth=1, height=130)
 
 		path_label = tk.Label(container, text=" - Wad Paths - ", foreground=style.LABEL_COLOR,
 							 background=style.BACKGROUND_COLOR)
 		path_label.place(relwidth=1, height=20)
 		self.path_box = tk.Listbox(container, highlightthickness=0, bg=style.ENTRY_COLOR,
 								  foreground=style.ENTRY_FOREGROUND)
-		self.path_box.place(relwidth=1, height=85, y=20)
+		self.path_box.place(relwidth=1, height=65, y=20)
 		CreateToolTip(path_label,
 					  "Select the wads you wish to install to the sd card. The `add folder` button will add all wads in the selected folder, but will not check subdirs. The `remove wad` button will remove the currently selected file from the listbox.")
 
 		button_container = themedFrame(container)
-		button_container.place(y = 110, relwidth = 1, height = 20)
+		button_container.place(y = 90, relwidth = 1, height = 20)
 
 		self.add_button = Button(button_container, self.add, text="add wad", font=style.monospace)
 		self.add_button.place(relx=0, relwidth=0.333, height=20, width=- 6)
@@ -371,6 +378,7 @@ class gui(tk.Tk):
 
 		self.remove_button = Button(button_container, self.remove, text="remove wad", font=style.monospace)
 		self.remove_button.place(relx=0.666, relwidth=0.333, height=20, x=+ 6, width=- 6)
+
 		# -------------------------------------------------
 
 		console_label = tk.Label(outer_frame, text="Console:", background="black", foreground="white",
@@ -432,7 +440,11 @@ class gui(tk.Tk):
 
 		def process_wads(wadlist):
 			for wad in wadlist:
-				execlist = [script, keys, cert, wad, sd, tid] if tid else [script, keys, cert, wad, sd]
+				execlist = [script, keys, cert, wad, sd]
+				if tid:
+					execlist.append(tid)
+					if self.use_nullkey:
+						execlist.append("--nullkey")
 				self.threader.do_async(execute_script, [execlist, self.output_to_console])
 				self.threader.join() #Wait til complete to start next
 
