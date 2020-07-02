@@ -395,20 +395,32 @@ class gui(tk.Tk):
 			return
 
 		script = os.path.realpath("wad2bin.exe")
+		if len(script) > 259:
+			self.output_to_console("Script path too long, must be less than 259 characters")
+			return
 
 		sd = self.sd_box.get().strip()
 		if not sd:
 			self.output_to_console("Output path (SD Card) not selected.\n")
+			return
+		if len(sd) > 259:
+			self.output_to_console("SD path too long, must be less than 259 characters")
 			return
 
 		keys = self.keys_box.get().strip()
 		if not keys:
 			self.output_to_console("No keys.bin provided, this can be dumped from your Wii\n")
 			return
+		if len(keys) > 259:
+			self.output_to_console("Keys file path too long, must be less than 259 characters")
+			return
 
 		cert = self.cert_box.get().strip()
 		if not cert:
 			self.output_to_console("No device.cert provided, this can be dumped from your Wii\n")
+			return
+		if len(cert) > 259:
+			self.output_to_console("Cert file path too long, must be less than 259 characters")
 			return
 	
 		tid = self.tid_box.get().strip()
