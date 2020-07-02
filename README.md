@@ -121,6 +121,11 @@ The title ID from the parent game must be provided as an additional command line
 
 Any DLCs not appearing on this list will return an error if used as the input WAD package for the program. If you come across a DLC that can be loaded from the SD card and doesn't appear on this list, please contact me or open an issue and I'll gladly add it.
 
+GUI:
+--------------
+
+A Python-based graphical frontend for the program is available as [gui.py](https://github.com/DarkMatterCore/wad2bin/raw/master/gui.py). Big thanks to [LyfeOnEdge](https://github.com/LyfeOnEdge) for developing it!
+
 Differences between `content.bin` files and `<index>.bin` files:
 --------------
 
