@@ -42,7 +42,7 @@ static const u32 g_supportedDLCs[] = {
     0x735A4500, /* "sZEx" (DLC5). */
     0x735A4600, /* "sZFx" (DLC6). */
     
-    /* The Beatles Rock Band ("R9Jx"). */
+    /* The Beatles: Rock Band ("R9Jx"). */
     0x72394A00, /* "r9Jx". */
     
     /* Rock Band 3 ("SZBx"). */
@@ -100,19 +100,20 @@ bool binIsDlcTitleConvertible(u64 tid)
     return false;
 }
 
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size)
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd_size)
+    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd->size || !tmd->data || \
+        !(tmd_common_block = tmdGetCommonBlock(tmd->data)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
-    TmdCommonBlock *tmd_common_block = NULL;
+    u64 aligned_tmd_size = ALIGN_UP(tmd->size, WAD_BLOCK_SIZE);
     TmdContentRecord *tmd_contents = NULL;
     
     u16 content_count = 0;
@@ -143,15 +144,15 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     BinContentCertArea cert_area = {0};
     u8 ap_private_key[ECC_PRIV_KEY_SIZE - 2] = {0};
     ap_private_key[ECC_PRIV_KEY_SIZE - 3] = 1; /* Keep it simple, don't generate a random value for the key. */
+    u8 ap_cert_hash[SHA1_HASH_SIZE] = {0};
     
     FILE *content_bin = NULL;
     
     bool success = false;
     
-    /* Retrieve TMD common block, contents and content count. */
-    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
-    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    /* Retrieve TMD content count and content records. */
     content_count = bswap_16(tmd_common_block->content_count);
+    tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);
     
     /* Retrieve required keydata. */
     console_id = keysGetConsoleId();
@@ -163,7 +164,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     device_cert = keysGetDeviceCertificate();
     
     /* Initialize SHA-1 context used to calculate a checksum over the backup area. */
-    /* Needed to generate the ECSDA signature at the start of Part F. */
+    /* Needed to generate the ECDSA signature at the start of Part F. */
     mbedtls_sha1_init(&sha1_ctx);
     mbedtls_sha1_starts(&sha1_ctx);
     
@@ -324,7 +325,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     bk_header.type = (u16)WadType_BackupPackage;
     bk_header.version = (u16)WadVersion_BackupPackage;
     bk_header.console_id = console_id;
-    bk_header.content_tmd_size = (u32)tmd_size;
+    bk_header.content_tmd_size = (u32)tmd->size;
     
     /* Calculate content data size and generate the included contents bitfield. */
     for(u16 i = 0; i < content_count; i++)
@@ -368,7 +369,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     mbedtls_sha1_update(&sha1_ctx, (u8*)&bk_header, sizeof(WadBackupPackageHeader));
     
     /* Write plaintext TMD (Part D). */
-    res = fwrite(tmd, 1, aligned_tmd_size, content_bin);
+    res = fwrite(tmd->data, 1, aligned_tmd_size, content_bin);
     if (res != aligned_tmd_size)
     {
         ERROR_MSG("Failed to write plaintext TMD (Part D) to \"" OS_PRINT_STR "\"!", out_path);
@@ -376,7 +377,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     }
     
     /* Update SHA-1 hash calculation. */
-    mbedtls_sha1_update(&sha1_ctx, tmd, aligned_tmd_size);
+    mbedtls_sha1_update(&sha1_ctx, tmd->data, aligned_tmd_size);
     
     /* Process content files (Part E). */
     printf("content.bin content data (Part E):\n");
@@ -409,13 +410,16 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         
         /* Write encrypted content file. */
         write_res = wadWriteUnpackedContentToPackage(content_bin, prng_key, cnt_iv, &sha1_ctx, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
-        if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
         
         /* Close content file. */
         fclose(cnt_fd);
         
         /* Stop process if there was an error. */
-        if (!write_res) goto out;
+        if (!write_res)
+        {
+            ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
+            goto out;
+        }
         
         /* Print content information. */
         printf("  Content #%u:\n", cnt_idx + 1);
@@ -434,17 +438,18 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     
     /* Prepare certificate area (Part F). */
     
-    /* Generate backup area ECSDA signature using the AP private key and the SHA-1 we calculated. */
-    cryptoGenerateEcsdaSignatureWithHash(ap_private_key, cert_area.signature, backup_area_hash, true);
+    /* Generate backup area ECDSA signature using the AP private key and the SHA-1 we calculated. */
+    cryptoGenerateEcdsaSignature(ap_private_key, cert_area.signature, true, backup_area_hash, SHA1_HASH_SIZE);
     
     /* Copy device certificate. */
     memcpy(&(cert_area.device_cert), device_cert, sizeof(CertSigEcc480PubKeyEcc480));
     
-    /* Set AP certificate signature type to ECSDA + SHA-1. */
+    /* Set AP certificate signature type to ECDSA + SHA-1. */
     cert_area.ap_cert.sig_block.sig_type = bswap_32((u32)SignatureType_Ecc480Sha1);
     
     /* Set AP certificate signature issuer. */
-    snprintf(cert_area.ap_cert.sig_block.issuer, sizeof(cert_area.ap_cert.sig_block.issuer), "Root-CA00000001-MS00000002-NG%08" PRIx32, console_id);
+    snprintf(cert_area.ap_cert.cert_common_block.issuer, sizeof(cert_area.ap_cert.cert_common_block.issuer), "%.*s-%.*s", 26, cert_area.device_cert.cert_common_block.issuer, 10, \
+             cert_area.device_cert.cert_common_block.name);
     
     /* Set AP certificate public key type to ECC-B233. */
     cert_area.ap_cert.cert_common_block.pub_key_type = bswap_32((u32)CertPubKeyType_Ecc480);
@@ -456,9 +461,17 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     /* Generate AP certificate public key using the AP private key. */
     cryptoGenerateEccPublicKey(ap_private_key, cert_area.ap_cert.pub_key_block.public_key);
     
-    /* Generate AP certificate ECSDA signature using the ECC private key. */
-    cryptoGenerateEcsdaSignatureWithData(ecc_private_key, cert_area.ap_cert.sig_block.signature, &(cert_area.ap_cert.sig_block.issuer), sizeof(cert_area.ap_cert.sig_block.issuer) + \
-                                       sizeof(CertCommonBlock) + sizeof(CertPublicKeyBlockEcc480), false);
+    /* Generate AP certificate ECDSA signature using the ECC private key. */
+    mbedtls_sha1((u8*)&(cert_area.ap_cert.cert_common_block), sizeof(CertCommonBlock) + sizeof(CertPublicKeyBlockEcc480), ap_cert_hash);
+    cryptoGenerateEcdsaSignature(ecc_private_key, cert_area.ap_cert.sig_block.signature, false, ap_cert_hash, SHA1_HASH_SIZE);
+    
+    /* Verify generated ECDSA signatures (probably overkill, but it's better to be safe than sorry). */
+    if (!cryptoVerifyEcdsaSignature(cert_area.device_cert.pub_key_block.public_key, cert_area.ap_cert.sig_block.signature, false, ap_cert_hash, SHA1_HASH_SIZE) || \
+        !cryptoVerifyEcdsaSignature(cert_area.ap_cert.pub_key_block.public_key, cert_area.signature, true, backup_area_hash, SHA1_HASH_SIZE))
+    {
+        ERROR_MSG("AP cert and/or backup WAD ECDSA signature verification failed!");
+        goto out;
+    }
     
     /* Write plaintext certificate area (Part F). */
     res = fwrite(&cert_area, 1, sizeof(BinContentCertArea), content_bin);
@@ -494,19 +507,20 @@ out:
     return success;
 }
 
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid)
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid, bool use_null_key)
 {
     size_t unpacked_wad_path_len = 0;
     size_t out_path_len = 0, new_out_path_len = 0;
+    TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd_size)
+    if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !tmd || !tmd->size || !tmd->data || \
+        !(tmd_common_block = tmdGetCommonBlock(tmd->data)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 aligned_tmd_size = ALIGN_UP(tmd_size, WAD_BLOCK_SIZE);
-    TmdCommonBlock *tmd_common_block = NULL;
+    u64 aligned_tmd_size = ALIGN_UP(tmd->size, WAD_BLOCK_SIZE);
     TmdContentRecord *tmd_contents = NULL;
     
     u16 content_count = 0;
@@ -524,10 +538,9 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
     
     bool success = false;
     
-    /* Retrieve TMD common block, contents and content count. */
-    tmd_common_block = tmdGetCommonBlockFromBuffer(tmd, tmd_size, NULL);
-    tmd_contents = TMD_CONTENTS(tmd_common_block);
+    /* Retrieve TMD content count and content records. */
     content_count = bswap_16(tmd_common_block->content_count);
+    tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);
     
     /* Retrieve required keydata. */
     console_id = keysGetConsoleId();
@@ -583,7 +596,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         bk_header.type = (u16)WadType_BackupPackage;
         bk_header.version = (u16)WadVersion_BackupPackage;
         bk_header.console_id = console_id;
-        bk_header.content_tmd_size = (u32)tmd_size;
+        bk_header.content_tmd_size = (u32)tmd->size;
         bk_header.content_data_size = (u32)ALIGN_UP(cnt_size, WAD_BLOCK_SIZE);
         bk_header.backup_area_size = (u32)(sizeof(WadBackupPackageHeader) + aligned_tmd_size + bk_header.content_data_size);
         memset(bk_header.included_contents, 0, sizeof(bk_header.included_contents));
@@ -616,7 +629,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         }
         
         /* Write plaintext TMD. */
-        res = fwrite(tmd, 1, aligned_tmd_size, indexed_bin);
+        res = fwrite(tmd->data, 1, aligned_tmd_size, indexed_bin);
         if (res != aligned_tmd_size)
         {
             fclose(indexed_bin);
@@ -626,7 +639,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         }
         
         /* Write encrypted content file. */
-        write_res = wadWriteUnpackedContentToPackage(indexed_bin, prng_key, cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
+        write_res = wadWriteUnpackedContentToPackage(indexed_bin, (use_null_key ? null_key : prng_key), cnt_iv, NULL, cnt_fd, cnt_idx, cnt_size, &aligned_cnt_size);
         if (!write_res) ERROR_MSG("Failed to write content file \"" OS_PRINT_STR "\" to \"" OS_PRINT_STR "\"!", unpacked_wad_path, out_path);
         
         /* Close files. */

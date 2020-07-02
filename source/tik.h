@@ -24,10 +24,13 @@
 #ifndef __TIK_H__
 #define __TIK_H__
 
-#include "signature.h"
+#include "cert.h"
 #include "crypto.h"
 
-#define TIK_MIN_SIZE    0x1A4   /* Equivalent to sizeof(TikSigHmac160) */
+#define SIGNED_TIK_MAX_SIZE         (u64)sizeof(TikSigRsa4096)
+#define SIGNED_TIK_MIN_SIZE         (u64)sizeof(TikSigHmac160)
+
+#define TIK_COMMON_KEY_INDEX_STR(x) ((x) == TikCommonKeyIndex_Korean ? "Korean" : ((x) == TikCommonKeyIndex_vWii ? "vWii" : "Normal"))
 
 typedef enum {
     TikType_None        = 0,
@@ -55,6 +58,7 @@ typedef struct {
 
 /// Placed after the ticket signature block.
 typedef struct {
+    char issuer[0x40];
     u8 ecdh_data[0x3C];             ///< ECDH data. Used to generate one-time key during install of console specific titles.
     u8 reserved_1[0x03];
     u8 titlekey[AES_BLOCK_SIZE];    ///< Encrypted titlekey. Its decrypted form is used to encrypt all content files from a title.
@@ -94,17 +98,38 @@ typedef struct {
     TikCommonBlock tik_common_block;
 } TikSigHmac160;
 
-/// Reads a ticket from a file and validates its signature size.
-u8 *tikReadTicketFromFile(FILE *fd, u64 ticket_size);
+/// Used to store ticket type, size and raw data.
+typedef struct {
+    u8 type;                        ///< TikType.
+    u64 size;                       ///< Raw ticket size.
+    bool valid_sig;                 ///< Determines if the ticket signature is valid or not.
+    u8 *data;                       ///< Raw ticket data.
+} Ticket;
 
-/// Returns a pointer to the common ticket block from a ticket stored in a memory buffer.
-/// Optionally, it also saves the ticket type to an input pointer if provided.
-TikCommonBlock *tikGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_ticket_type);
+/// Reads a ticket from a file and validates its signature.
+bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, CertificateChain *chain);
 
-/// Checks the Title ID from a common ticket block to determine if the title is exportable.
-bool tikIsTitleExportable(TikCommonBlock *tik_common_block);
+/// Fakesigns a ticket.
+void tikFakesignTicket(Ticket *ticket);
 
-/// Fakesigns a ticket stored in a buffer.
-void tikFakesignTicket(void *buf, u64 buf_size);
+/// Helper inline functions.
+
+ALWAYS_INLINE void tikFreeTicket(Ticket *ticket)
+{
+    if (!ticket) return;
+    if (ticket->data) free(ticket->data);
+    memset(ticket, 0, sizeof(Ticket));
+}
+
+ALWAYS_INLINE TikCommonBlock *tikGetCommonBlock(void *buf)
+{
+    return (TikCommonBlock*)signatureGetPayload(buf);
+}
+
+ALWAYS_INLINE u64 tikGetSignedTicketSize(void *buf)
+{
+    TikCommonBlock *tik_common_block = tikGetCommonBlock(buf);
+    return (u64)(tik_common_block != NULL ? (signatureGetBlockSize(signatureGetSigType(buf)) + sizeof(TikCommonBlock)) : 0);
+}
 
 #endif /* __TIK_H__ */

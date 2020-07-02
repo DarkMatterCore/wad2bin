@@ -22,34 +22,32 @@
 #include "utils.h"
 #include "tmd.h"
 
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose);
+static bool tmdGetTitleMetadataTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size);
 
-u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size)
+bool tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size, TitleMetadata *out_tmd, CertificateChain *chain)
 {
-    if (!fd || tmd_size < TMD_MIN_SIZE)
+    if (!fd || tmd_size < SIGNED_TMD_MIN_SIZE || tmd_size > SIGNED_TMD_MAX_SIZE || !out_tmd || !chain)
     {
         ERROR_MSG("Invalid parameters!");
-        return NULL;
+        return false;
     }
     
-    u8 *tmd = NULL;
     u64 res = 0;
-    
-    u8 tmd_type = 0;
-    u64 tmd_detected_size = 0;
-    
     bool success = false;
     
-    /* Allocate memory for the TMD. */
-    tmd = calloc(ALIGN_UP(tmd_size, WAD_BLOCK_SIZE), sizeof(u8));
-    if (!tmd)
+    /* Cleanup output TMD. */
+    memset(out_tmd, 0, sizeof(TitleMetadata));
+    
+    /* Allocate memory for the output TMD. */
+    out_tmd->data = (u8*)calloc(ALIGN_UP(tmd_size, WAD_BLOCK_SIZE), sizeof(u8));
+    if (!out_tmd->data)
     {
-        ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes TMD buffer!", tmd_size);
-        return NULL;
+        ERROR_MSG("Error allocating memory for the TMD!");
+        return false;
     }
     
     /* Read TMD. */
-    res = fread(tmd, 1, tmd_size, fd);
+    res = fread(out_tmd->data, 1, tmd_size, fd);
     if (res != tmd_size)
     {
         ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long TMD!", tmd_size);
@@ -57,211 +55,145 @@ u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size)
     }
     
     /* Check if the TMD size is valid. */
-    if (!tmdGetTitleMetadataTypeAndSize(tmd, tmd_size, &tmd_type, &tmd_detected_size, true)) goto out;
+    if (!tmdGetTitleMetadataTypeAndSize(out_tmd->data, tmd_size, &(out_tmd->type), &(out_tmd->size))) goto out;
     
-    if (tmd_size != tmd_detected_size)
+    if (tmd_size != out_tmd->size)
     {
-        ERROR_MSG("\nCalculated TMD size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", tmd_size, tmd_detected_size);
+        printf("\n");
+        ERROR_MSG("Calculated TMD size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", tmd_size, out_tmd->size);
+        goto out;
+    }
+    
+    /* Verify TMD signature. */
+    if (!certVerifySignatureFromSignedPayload(chain, out_tmd->data, out_tmd->size, &(out_tmd->valid_sig)))
+    {
+        ERROR_MSG("Failed to verify TMD signature!");
         goto out;
     }
     
     success = true;
     
 out:
-    if (!success && tmd)
-    {
-        free(tmd);
-        tmd = NULL;
-    }
+    if (!success) tmdFreeTitleMetadata(out_tmd);
     
-    return tmd;
+    return success;
 }
 
-TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_tmd_type)
+void tmdFakesignTitleMetadata(TitleMetadata *tmd)
 {
-    if (!buf || buf_size < TMD_MIN_SIZE)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return NULL;
-    }
-    
-    u8 tmd_type = 0;
-    u8 *buf_u8 = (u8*)buf;
     TmdCommonBlock *tmd_common_block = NULL;
     
-    if (!tmdGetTitleMetadataTypeAndSize(buf, buf_size, &tmd_type, NULL, false))
-    {
-        ERROR_MSG("Invalid TMD!");
-        return NULL;
-    }
+    u32 sig_type = 0;
+    u8 *signature = NULL;
+    u64 signature_size = 0;
     
-    switch(tmd_type)
-    {
-        case TmdType_SigRsa4096:
-            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa4096));
-            break;
-        case TmdType_SigRsa2048:
-            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockRsa2048));
-            break;
-        case TmdType_SigEcc480:
-            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockEcc480));
-            break;
-        case TmdType_SigHmac160:
-            tmd_common_block = (TmdCommonBlock*)(buf_u8 + sizeof(SignatureBlockHmac160));
-            break;
-        default:
-            ERROR_MSG("Invalid TMD type value!");
-            break;
-    }
+    u8 hash[SHA256_HASH_SIZE] = {0};
+    u16 *padding = NULL;
+    u64 tmd_hash_area_size = 0;
     
-    if (tmd_common_block && out_tmd_type) *out_tmd_type = tmd_type;
-    
-    return tmd_common_block;
-}
-
-bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block)
-{
-    if (!tmd_common_block)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return false;
-    }
-    
-    u64 title_id = bswap_64(tmd_common_block->system_version);
-    u32 tid_upper = TITLE_UPPER(title_id);
-    
-    if (tid_upper != TITLE_TYPE_SYSTEM)
-    {
-        ERROR_MSG("TMD system version doesn't reference an IOS version!");
-        return false;
-    }
-    
-    return true;
-}
-
-void tmdFakesignTitleMetadata(void *buf, u64 buf_size)
-{
-    if (!buf || buf_size < TMD_MIN_SIZE) return;
-    
-    u8 tmd_type = 0;
-    TmdCommonBlock *tmd_common_block = NULL;
-    
-    tmd_common_block = tmdGetCommonBlockFromBuffer(buf, buf_size, &tmd_type);
-    if (!tmd_common_block) return;
+    if (!tmd || tmd->type == TmdType_None || tmd->type > TmdType_SigHmac160 || tmd->size < SIGNED_TMD_MIN_SIZE || tmd->size > SIGNED_TMD_MAX_SIZE || !tmdIsValidTitleMetadata(tmd->data)) return;
     
     /* Wipe signature. */
-    switch(tmd_type)
-    {
-        case TmdType_SigRsa4096:
-        {
-            SignatureBlockRsa4096 *sig_rsa_4096 = (SignatureBlockRsa4096*)buf;
-            memset(sig_rsa_4096->signature, 0, sizeof(sig_rsa_4096->signature));
-            break;
-        }
-        case TmdType_SigRsa2048:
-        {
-            SignatureBlockRsa2048 *sig_rsa_2048 = (SignatureBlockRsa2048*)buf;
-            memset(sig_rsa_2048->signature, 0, sizeof(sig_rsa_2048->signature));
-            break;
-        }
-        case TmdType_SigEcc480:
-        {
-            SignatureBlockEcc480 *sig_ecc_480 = (SignatureBlockEcc480*)buf;
-            memset(sig_ecc_480->signature, 0, sizeof(sig_ecc_480->signature));
-            break;
-        }
-        case TmdType_SigHmac160:
-        {
-            SignatureBlockHmac160 *sig_hmac_160 = (SignatureBlockHmac160*)buf;
-            memset(sig_hmac_160->signature, 0, sizeof(sig_hmac_160->signature));
-            break;
-        }
-        default:
-            break;
-    }
+    sig_type = signatureGetSigType(tmd->data);
+    signature = signatureGetSig(tmd->data);
+    signature_size = signatureGetSigSize(sig_type);
+    memset(signature, 0, signature_size);
     
     /* Modify TMD until we get a hash that starts with 0x00. */
-    u8 hash[SHA1_HASH_SIZE] = {0};
-    u16 *padding = (u16*)tmd_common_block->reserved_4;
-    u64 tmd_size = TMD_COMMON_BLOCK_SIZE(tmd_common_block);
+    /* Return right away if we're dealing with a HMAC signature. */
+    if (sig_type == SignatureType_Hmac160Sha1) return;
+    
+    tmd_common_block = tmdGetCommonBlock(tmd->data);
+    padding = (u16*)tmd_common_block->reserved_4;
+    tmd_hash_area_size = tmdGetSignedTitleMetadataHashAreaSize(tmd->data);
     
     for(u16 i = 0; i < 65535; i++)
     {
         *padding = bswap_16(i);
-        mbedtls_sha1((u8*)tmd_common_block, tmd_size, hash);
+        
+        switch(sig_type)
+        {
+            case SignatureType_Rsa4096Sha1:
+            case SignatureType_Rsa4096Sha256:
+            case SignatureType_Rsa2048Sha1:
+            case SignatureType_Rsa2048Sha256:
+                mbedtls_sha1((u8*)tmd_common_block, tmd_hash_area_size, hash);
+                break;
+            case SignatureType_Ecc480Sha1:
+            case SignatureType_Ecc480Sha256:
+                mbedtls_sha256((u8*)tmd_common_block, tmd_hash_area_size, hash, 0);
+                break;
+            default:
+                break;
+        }
+        
         if (hash[0] == 0) break;
     }
+    
+    /* Update signature validity. */
+    tmd->valid_sig = false;
 }
 
-bool tmdGetTitleMetadataTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose)
+static bool tmdGetTitleMetadataTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size)
 {
-    if (!buf || buf_size < TMD_MIN_SIZE || (!out_type && !out_size))
+    TmdCommonBlock *tmd_common_block = NULL;
+    u32 sig_type = 0;
+    u64 signed_tmd_size = 0;
+    u8 type = TmdType_None;
+    
+    if (!buf || buf_size < SIGNED_TMD_MIN_SIZE || (!out_type && !out_size))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u32 sig_type = 0;
-    u64 offset = 0;
-    u8 type = TmdType_None;
-    const u8 *buf_u8 = (const u8*)buf;
-    const TmdCommonBlock *tmd_common_block = NULL;
+    if (!(tmd_common_block = tmdGetCommonBlock(buf)) || !(signed_tmd_size = tmdGetSignedTitleMetadataSize(buf)))
+    {
+        printf("\n");
+        ERROR_MSG("Input buffer doesn't hold a valid signed TMD!");
+        return false;
+    }
     
-    memcpy(&sig_type, buf_u8, sizeof(u32));
-    sig_type = bswap_32(sig_type);
+    if (signed_tmd_size > buf_size)
+    {
+        printf("\n");
+        ERROR_MSG("Calculated signed TMD size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_tmd_size, buf_size);
+        return false;
+    }
     
+    sig_type = signatureGetSigType(buf);
+    
+    printf("  Signature type:         0x%08" PRIx32, sig_type);
     switch(sig_type)
     {
         case SignatureType_Rsa4096Sha1:
         case SignatureType_Rsa4096Sha256:
             type = TmdType_SigRsa4096;
-            offset += sizeof(SignatureBlockRsa4096);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            printf(" (RSA-4096 + %s)", (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Rsa2048Sha1:
         case SignatureType_Rsa2048Sha256:
             type = TmdType_SigRsa2048;
-            offset += sizeof(SignatureBlockRsa2048);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            printf(" (RSA-2048 + %s)", (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Ecc480Sha1:
         case SignatureType_Ecc480Sha256:
             type = TmdType_SigEcc480;
-            offset += sizeof(SignatureBlockEcc480);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            printf(" (ECDSA + %s)", (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
             break;
         case SignatureType_Hmac160Sha1:
             type = TmdType_SigHmac160;
-            offset += sizeof(SignatureBlockHmac160);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            printf(" (HMAC + SHA-1)");
             break;
         default:
-            ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
-            return false;
+            break;
     }
+    printf(".\n");
     
-    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
-    
-    tmd_common_block = (const TmdCommonBlock*)(buf_u8 + offset);
-    offset += sizeof(TmdCommonBlock);
-    
-    /* Retrieve content count. */
-    u16 content_count = bswap_16(tmd_common_block->content_count);
-    if (!content_count || content_count > TMD_MAX_CONTENT_COUNT)
-    {
-        ERROR_MSG("\nInvalid TMD content count!");
-        return false;
-    }
-    
-    offset += (content_count * sizeof(TmdContentRecord));
-    if (offset > buf_size)
-    {
-        ERROR_MSG("\nCalculated end offset exceeds TMD buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
-        return false;
-    }
+    printf("  Signature issuer:       %.*s.\n", (int)sizeof(tmd_common_block->issuer), tmd_common_block->issuer);
     
     if (out_type) *out_type = type;
-    if (out_size) *out_size = offset;
+    if (out_size) *out_size = signed_tmd_size;
     
     return true;
 }

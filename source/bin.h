@@ -26,7 +26,6 @@
 
 #include "wad.h"
 #include "crypto.h"
-#include "cert.h"
 
 #define IMET_MAGIC              (u32)0x494D4554         /* "IMET". */
 #define IMET_HASHED_AREA_SIZE   (u32)0x600
@@ -67,7 +66,7 @@ typedef struct {
 /// Each part from a content.bin file must be aligned to a 64-byte boundary, using zeroes to pad data if necessary.
 typedef struct {
     u64 title_id;                       ///< Title ID.
-    u32 icon_bin_size;                  ///< Decrypted icon.bin size. Align to AES_BLOCK_SIZE to get the Part B size.
+    u32 icon_bin_size;                  ///< Decrypted icon.bin size. Align to WAD_BLOCK_SIZE to get the Part B size.
     u8 header_hash[MD5_HASH_SIZE];      ///< MD5 hash of the header with this field set to the MD5 blanker.
     u8 icon_bin_hash[MD5_HASH_SIZE];    ///< MD5 hash of the decrypted icon.bin (with WAD block alignment padding).
     u32 unknown_tid_lower;              ///< Title ID lower u32 from another title (unknown purpose).
@@ -78,7 +77,7 @@ typedef struct {
 
 /// Plaintext certificate area (Part F).
 typedef struct {
-    u8 signature[ECSDA_SIG_SIZE];
+    u8 signature[ECDSA_SIG_SIZE];
     CertSigEcc480PubKeyEcc480 device_cert;
     CertSigEcc480PubKeyEcc480 ap_cert;
 } BinContentCertArea;
@@ -87,9 +86,9 @@ typedef struct {
 bool binIsDlcTitleConvertible(u64 tid);
 
 /// Generates a content.bin file using an unpacked WAD data directory and TMD data loaded into memory.
-bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size);
+bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd);
 
 /// Generates <index>.bin file(s) using an unpacked WAD data directory, TMD data loaded into memory and a parent title ID.
-bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, u8 *tmd, u64 tmd_size, u64 parent_tid);
+bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, TitleMetadata *tmd, u64 parent_tid, bool use_null_key);
 
 #endif /* __BIN_H__ */

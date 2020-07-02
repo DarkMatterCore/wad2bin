@@ -21,248 +21,320 @@
 
 #include "utils.h"
 #include "cert.h"
+#include "crypto.h"
 
 #define CERT_TYPE(sig)  (pub_key_type == CertPubKeyType_Rsa4096 ? CertType_Sig##sig##_PubKeyRsa4096 : \
                         (pub_key_type == CertPubKeyType_Rsa2048 ? CertType_Sig##sig##_PubKeyRsa2048 : CertType_Sig##sig##_PubKeyEcc480))
 
-static bool certGetCertificateTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose);
+static bool certGetCertificateTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size);
 
-u8 *certReadRawCertificateChainFromFile(FILE *fd, u64 cert_chain_size)
+bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, CertificateChain *out_chain)
 {
-    if (!fd || cert_chain_size < CERT_MIN_SIZE)
+    if (!fd || cert_chain_size < SIGNED_CERT_MIN_SIZE || !out_chain)
     {
         ERROR_MSG("Invalid parameters!");
-        return NULL;
+        return false;
     }
     
-    u8 *raw_chain = NULL;
     u64 res = 0, offset = 0;
-    u32 cert_num = 0;
+    Certificate *tmp_certs = NULL;
     
     bool success = false;
     
+    /* Cleanup output certificate chain. */
+    memset(out_chain, 0, sizeof(CertificateChain));
+    
     /* Allocate memory for the raw certificate chain. */
-    raw_chain = calloc(ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE), sizeof(u8));
-    if (!raw_chain)
+    out_chain->raw_chain = (u8*)calloc(ALIGN_UP(cert_chain_size, WAD_BLOCK_SIZE), sizeof(u8));
+    if (!out_chain->raw_chain)
     {
-        ERROR_MSG("Unable to allocate 0x%" PRIx64 " bytes raw certificate chain buffer!", cert_chain_size);
-        return NULL;
+        ERROR_MSG("Error allocating 0x%" PRIx64 " bytes raw certificate chain buffer!", cert_chain_size);
+        return false;
     }
     
     /* Read raw certificate chain. */
-    res = fread(raw_chain, 1, cert_chain_size, fd);
+    res = fread(out_chain->raw_chain, 1, cert_chain_size, fd);
     if (res != cert_chain_size)
     {
         ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long raw certificate chain!", cert_chain_size);
         goto out;
     }
     
+    out_chain->raw_chain_size = cert_chain_size;
+    
     /* Check each certificate in the chain. */
-    while(offset < cert_chain_size)
+    while(offset < cert_chain_size && (cert_chain_size - offset) >= SIGNED_CERT_MIN_SIZE)
     {
-        if ((cert_chain_size - offset) < CERT_MIN_SIZE) break;
+        /* Reallocate certificate buffer. */
+        tmp_certs = (Certificate*)realloc(out_chain->certs, (out_chain->count + 1) * sizeof(Certificate));
+        if (!tmp_certs)
+        {
+            ERROR_MSG("Failed to reallocate certificate chain struct buffer!");
+            goto out;
+        }
         
-        u8 cert_type = 0;
-        u64 cert_size = 0;
+        out_chain->certs = tmp_certs;
+        tmp_certs = NULL;
         
-        printf("Certificate #%u:\n", cert_num + 1);
+        memset(&(out_chain->certs[out_chain->count]), 0, sizeof(Certificate));
         
-        if (!certGetCertificateTypeAndSize(raw_chain + offset, cert_chain_size, &cert_type, &cert_size, true))
+        /* Get certificate type and size. */
+        printf("Certificate #%u:\n", out_chain->count + 1);
+        
+        if (!certGetCertificateTypeAndSize(out_chain->raw_chain + offset, cert_chain_size, &(out_chain->certs[out_chain->count].type), &(out_chain->certs[out_chain->count].size)))
         {
             ERROR_MSG("Invalid certificate detected in chain!");
             goto out;
         }
         
-        printf("\n");
-        
-        offset += cert_size;
-        cert_num++;
+        /* Update new certificate entry. */
+        memcpy(out_chain->certs[out_chain->count].data, out_chain->raw_chain + offset, out_chain->certs[out_chain->count].size);
+        offset += out_chain->certs[out_chain->count].size;
+        out_chain->count++;
     }
     
     if (offset != cert_chain_size)
     {
-        ERROR_MSG("\nCalculated certificate chain size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", offset, cert_chain_size);
+        ERROR_MSG("Calculated certificate chain size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", offset, cert_chain_size);
         goto out;
+    }
+    
+    if (out_chain->count < 3)
+    {
+        ERROR_MSG("Certificate chain holds less than 3 certificates!");
+        goto out;
+    }
+    
+    /* Verify certificate signatures. */
+    for(u32 i = 0; i < out_chain->count; i++)
+    {
+        bool valid_sig = false;
+        CertCommonBlock *cert_common_block = certGetCommonBlock(out_chain->certs[i].data);
+        
+        if (!certVerifySignatureFromSignedPayload(out_chain, out_chain->certs[i].data, out_chain->certs[i].size, &valid_sig) || !valid_sig)
+        {
+            ERROR_MSG("Signature verification failed for certificate \"%s\"!", cert_common_block->name);
+            goto out;
+        }
     }
     
     success = true;
     
 out:
-    if (!success && raw_chain)
-    {
-        free(raw_chain);
-        raw_chain = NULL;
-    }
+    if (!success) certFreeCertificateChain(out_chain);
     
-    return raw_chain;
+    return success;
 }
 
-CertCommonBlock *certGetCertificateCommonBlockFromBuffer(void *buf, u64 buf_size)
+bool certVerifySignatureFromSignedPayload(CertificateChain *chain, void *signed_payload, u64 signed_payload_size, bool *out_result)
 {
-    if (!buf || buf_size < CERT_MIN_SIZE)
-    {
-        ERROR_MSG("Invalid parameters!");
-        return NULL;
-    }
+    u32 sig_type = 0;
+    u8 *signature = NULL;
+    u64 signature_block_size = 0;
     
-    u8 cert_type = 0;
-    CertCommonBlock *cert_common_block = NULL;
+    u8 *payload = NULL;
+    u64 payload_size = 0, payload_hash_size = 0;
+    u8 payload_hash[SHA256_HASH_SIZE] = {0};
     
-    if (!certGetCertificateTypeAndSize(buf, buf_size, &cert_type, NULL, false))
-    {
-        ERROR_MSG("Invalid certificate!");
-        return NULL;
-    }
+    u32 cert_pub_key_type = 0, cert_public_exponent = 0;
+    char *cert_name = NULL;
+    u8 *cert_pub_key = NULL;
+    u64 cert_name_len = 0, cert_pub_key_size = 0;
+    bool valid_sig = false;
     
-    switch(cert_type)
-    {
-        case CertType_SigRsa4096_PubKeyRsa4096:
-            cert_common_block = &(((CertSigRsa4096PubKeyRsa4096*)buf)->cert_common_block);
-            break;
-        case CertType_SigRsa4096_PubKeyRsa2048:
-            cert_common_block = &(((CertSigRsa4096PubKeyRsa2048*)buf)->cert_common_block);
-            break;
-        case CertType_SigRsa4096_PubKeyEcc480:
-            cert_common_block = &(((CertSigRsa4096PubKeyEcc480*)buf)->cert_common_block);
-            break;
-        case CertType_SigRsa2048_PubKeyRsa4096:
-            cert_common_block = &(((CertSigRsa2048PubKeyRsa4096*)buf)->cert_common_block);
-            break;
-        case CertType_SigRsa2048_PubKeyRsa2048:
-            cert_common_block = &(((CertSigRsa2048PubKeyRsa2048*)buf)->cert_common_block);
-            break;
-        case CertType_SigRsa2048_PubKeyEcc480:
-            cert_common_block = &(((CertSigRsa2048PubKeyEcc480*)buf)->cert_common_block);
-            break;
-        case CertType_SigEcc480_PubKeyRsa4096:
-            cert_common_block = &(((CertSigEcc480PubKeyRsa4096*)buf)->cert_common_block);
-            break;
-        case CertType_SigEcc480_PubKeyRsa2048:
-            cert_common_block = &(((CertSigEcc480PubKeyRsa2048*)buf)->cert_common_block);
-            break;
-        case CertType_SigEcc480_PubKeyEcc480:
-            cert_common_block = &(((CertSigEcc480PubKeyEcc480*)buf)->cert_common_block);
-            break;
-        case CertType_SigHmac160_PubKeyRsa4096:
-            cert_common_block = &(((CertSigHmac160PubKeyRsa4096*)buf)->cert_common_block);
-            break;
-        case CertType_SigHmac160_PubKeyRsa2048:
-            cert_common_block = &(((CertSigHmac160PubKeyRsa2048*)buf)->cert_common_block);
-            break;
-        case CertType_SigHmac160_PubKeyEcc480:
-            cert_common_block = &(((CertSigHmac160PubKeyEcc480*)buf)->cert_common_block);
-            break;
-        default:
-            break;
-    }
-    
-    return cert_common_block;
-}
-
-static bool certGetCertificateTypeAndSize(const void *buf, u64 buf_size, u8 *out_type, u64 *out_size, bool verbose)
-{
-    if (!buf || buf_size < CERT_MIN_SIZE || (!out_type && !out_size))
+    if (!chain || !chain->count || !chain->certs || !signed_payload || !signed_payload_size || !out_result || !(payload = (u8*)signatureGetPayload(signed_payload)))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    u64 offset = 0;
-    u8 type = CertType_None;
-    const u8 *buf_u8 = (const u8*)buf;
-    u32 sig_type = 0, pub_key_type = 0, date = 0;
+    /* Retrieve signature type, signature and signature block size. */
+    sig_type = signatureGetSigType(signed_payload);
+    signature = signatureGetSig(signed_payload);
+    signature_block_size = signatureGetBlockSize(sig_type);
     
-    memcpy(&sig_type, buf_u8, sizeof(u32));
-    sig_type = bswap_32(sig_type);
+    /* Validate signed payload size. */
+    if (signature_block_size >= signed_payload_size)
+    {
+        ERROR_MSG("Signature block size exceeds payload size!");
+        return false;
+    }
     
+    /* Skip signature verification if we're dealing with a HMAC signature or a signature issued by Root. */
+    if (sig_type == SignatureType_Hmac160Sha1 || (strlen((char*)payload) == 4 && !strcmp((char*)payload, "Root")))
+    {
+        *out_result = true;
+        return true;
+    }
+    
+    /* Get pointer to the certificate name. */
+    cert_name = strrchr((char*)payload, '-');
+    if (!cert_name || (cert_name_len = strlen(cert_name)) <= 1)
+    {
+        ERROR_MSG("Invalid signature issuer in input payload!");
+        return false;
+    }
+    
+    cert_name++;
+    cert_name_len--;
+    
+    /* Calculate payload hash. */
+    payload_size = (signed_payload_size - signature_block_size);
+    switch(sig_type)
+    {
+        case SignatureType_Rsa4096Sha1:
+        case SignatureType_Rsa2048Sha1:
+        case SignatureType_Ecc480Sha1:
+            payload_hash_size = SHA1_HASH_SIZE;
+            mbedtls_sha1(payload, payload_size, payload_hash);
+            break;
+        case SignatureType_Rsa4096Sha256:
+        case SignatureType_Rsa2048Sha256:
+        case SignatureType_Ecc480Sha256:
+            payload_hash_size = SHA256_HASH_SIZE;
+            mbedtls_sha256(payload, payload_size, payload_hash, 0);
+            break;
+        default:
+            break;
+    }
+    
+    /* Look for the right certificate in the provided certificate chain. */
+    for(u32 i = 0; i < chain->count; i++)
+    {
+        /* Get certificate common block and check the certificate name. */
+        CertCommonBlock *cert_common_block = certGetCommonBlock(chain->certs[i].data);
+        if (!cert_common_block || strlen(cert_common_block->name) != cert_name_len || strcmp(cert_common_block->name, cert_name) != 0) continue;
+        
+        /* Check if the public key type from the certificate matches the signature type from the signed payload. */
+        cert_pub_key_type = bswap_32(cert_common_block->pub_key_type);
+        if ((cert_pub_key_type == CertPubKeyType_Rsa4096 && sig_type != SignatureType_Rsa4096Sha1 && sig_type != SignatureType_Rsa4096Sha256) || \
+            (cert_pub_key_type == CertPubKeyType_Rsa2048 && sig_type != SignatureType_Rsa2048Sha1 && sig_type != SignatureType_Rsa2048Sha256) || \
+            (cert_pub_key_type == CertPubKeyType_Ecc480  && sig_type != SignatureType_Ecc480Sha1  && sig_type != SignatureType_Ecc480Sha256))
+        {
+            ERROR_MSG("Found certificate \"%s\" for the input signed payload, but its public key type doesn't match the expected signature types! (0x%08" PRIx32 ", 0x%08" PRIx32 ")", cert_name, \
+                      cert_pub_key_type, sig_type);
+            return false;
+        }
+        
+        /* Update certificate variables. */
+        cert_pub_key = certGetPublicKey(cert_common_block);
+        cert_public_exponent = certGetPublicExponent(cert_common_block);
+        cert_pub_key_size = certGetPublicKeySize(cert_pub_key_type);
+        
+        break;
+    }
+    
+    if (!cert_pub_key)
+    {
+        ERROR_MSG("Unable to find \"%s\" certificate for the input signed payload!", cert_name);
+        return false;
+    }
+    
+    /* Verify signed payload signature. */
     switch(sig_type)
     {
         case SignatureType_Rsa4096Sha1:
         case SignatureType_Rsa4096Sha256:
-            offset += sizeof(SignatureBlockRsa4096);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-4096 + %s).\n", sig_type, (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
-            break;
         case SignatureType_Rsa2048Sha1:
         case SignatureType_Rsa2048Sha256:
-            offset += sizeof(SignatureBlockRsa2048);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (RSA-2048 + %s).\n", sig_type, (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            valid_sig = cryptoVerifyRsaSignature(cert_pub_key, cert_pub_key_size, cert_public_exponent, signature, payload_hash, payload_hash_size);
             break;
         case SignatureType_Ecc480Sha1:
         case SignatureType_Ecc480Sha256:
-            offset += sizeof(SignatureBlockEcc480);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (ECSDA + %s).\n", sig_type, (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
-            break;
-        case SignatureType_Hmac160Sha1:
-            offset += sizeof(SignatureBlockHmac160);
-            if (verbose) printf("  Signature type:         0x%08" PRIx32 " (HMAC + SHA-1).\n", sig_type);
+            valid_sig = cryptoVerifyEcdsaSignature(cert_pub_key, signature, false, payload_hash, payload_hash_size);
             break;
         default:
-            ERROR_MSG("Invalid signature type value! (0x%08" PRIx32 ").", sig_type);
-            return false;
+            break;
     }
     
-    if (verbose) printf("  Signature issuer:       %.*s.\n", (int)MEMBER_SIZE(SignatureBlockRsa4096, issuer), (const char*)(buf_u8 + (offset - MEMBER_SIZE(SignatureBlockRsa4096, issuer))));
+    *out_result = valid_sig;
     
-    memcpy(&pub_key_type, buf_u8 + offset, sizeof(u32));
-    pub_key_type = bswap_32(pub_key_type);
-    offset += MEMBER_SIZE(CertCommonBlock, pub_key_type);
+    return true;
+}
+
+static bool certGetCertificateTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *out_size)
+{
+    CertCommonBlock *cert_common_block = NULL;
+    u32 sig_type = 0, pub_key_type = 0, date = 0;
+    u64 signed_cert_size = 0;
+    u8 type = CertType_None;
     
-    if (verbose) printf("  Name:                   %.*s.\n", (int)MEMBER_SIZE(CertCommonBlock, name), (const char*)(buf_u8 + offset));
-    offset += MEMBER_SIZE(CertCommonBlock, name);
-    
-    if (verbose)
+    if (!buf || buf_size < SIGNED_CERT_MIN_SIZE || (!out_type && !out_size))
     {
-        memcpy(&date, buf_u8 + offset, sizeof(u32));
-        date = bswap_32(date);
-        printf("  Date:                   0x%08" PRIx32 ".\n", date);
-    }
-    
-    offset += MEMBER_SIZE(CertCommonBlock, date);
-    
-    switch(pub_key_type)
-    {
-        case CertPubKeyType_Rsa4096:
-            offset += sizeof(CertPublicKeyBlockRsa4096);
-            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (RSA-4096).\n", pub_key_type);
-            break;
-        case CertPubKeyType_Rsa2048:
-            offset += sizeof(CertPublicKeyBlockRsa2048);
-            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (RSA-2048).\n", pub_key_type);
-            break;
-        case CertPubKeyType_Ecc480:
-            offset += sizeof(CertPublicKeyBlockEcc480);
-            if (verbose) printf("  Public key type:        0x%08" PRIx32 " (ECC-B233).\n", pub_key_type);
-            break;
-        default:
-            ERROR_MSG("\nInvalid public key type value! (0x%08" PRIx32 ").", pub_key_type);
-            return false;
-    }
-    
-    if (offset > buf_size)
-    {
-        ERROR_MSG("\nCalculated end offset exceeds certificate buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", offset, buf_size);
+        printf("\n");
+        ERROR_MSG("Invalid parameters!");
         return false;
     }
     
-    if (sig_type == SignatureType_Rsa4096Sha1 || sig_type == SignatureType_Rsa4096Sha256)
+    if (!(cert_common_block = certGetCommonBlock(buf)) || !(signed_cert_size = certGetSignedCertificateSize(buf)))
     {
-        type = CERT_TYPE(Rsa4096);
-    } else
-    if (sig_type == SignatureType_Rsa2048Sha1 || sig_type == SignatureType_Rsa2048Sha256)
-    {
-        type = CERT_TYPE(Rsa2048);
-    } else
-    if (sig_type == SignatureType_Ecc480Sha1 || sig_type == SignatureType_Ecc480Sha256)
-    {
-        type = CERT_TYPE(Ecc480);
-    } else
-    if (sig_type == SignatureType_Hmac160Sha1)
-    {
-        type = CERT_TYPE(Hmac160);
+        printf("\n");
+        ERROR_MSG("Input buffer doesn't hold a valid signed certificate!");
+        return false;
     }
     
+    if (signed_cert_size > buf_size)
+    {
+        printf("\n");
+        ERROR_MSG("Calculated signed certificate size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_cert_size, buf_size);
+        return false;
+    }
+    
+    sig_type = signatureGetSigType(buf);
+    pub_key_type = bswap_32(cert_common_block->pub_key_type);
+    date = bswap_32(cert_common_block->date);
+    
+    printf("  Signature type:         0x%08" PRIx32, sig_type);
+    switch(sig_type)
+    {
+        case SignatureType_Rsa4096Sha1:
+        case SignatureType_Rsa4096Sha256:
+            type = CERT_TYPE(Rsa4096);
+            printf(" (RSA-4096 + %s)", (sig_type == SignatureType_Rsa4096Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Rsa2048Sha1:
+        case SignatureType_Rsa2048Sha256:
+            type = CERT_TYPE(Rsa2048);
+            printf(" (RSA-2048 + %s)", (sig_type == SignatureType_Rsa2048Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Ecc480Sha1:
+        case SignatureType_Ecc480Sha256:
+            type = CERT_TYPE(Ecc480);
+            printf(" (ECDSA + %s)", (sig_type == SignatureType_Ecc480Sha1 ? "SHA-1" : "SHA-256"));
+            break;
+        case SignatureType_Hmac160Sha1:
+            type = CERT_TYPE(Hmac160);
+            printf(" (HMAC + SHA-1)");
+            break;
+        default:
+            break;
+    }
+    printf(".\n");
+    
+    printf("  Signature issuer:       %.*s.\n", (int)sizeof(cert_common_block->issuer), cert_common_block->issuer);
+    
+    printf("  Public key type:        0x%08" PRIx32, pub_key_type);
+    switch(pub_key_type)
+    {
+        case CertPubKeyType_Rsa4096:
+            printf(" (RSA-4096)");
+            break;
+        case CertPubKeyType_Rsa2048:
+            printf(" (RSA-2048)");
+            break;
+        case CertPubKeyType_Ecc480:
+            printf(" (ECC-B233)");
+            break;
+        default:
+            break;
+    }
+    printf(".\n");
+    
+    printf("  Name:                   %.*s.\n", (int)sizeof(cert_common_block->name), cert_common_block->name);
+    printf("  Date:                   0x%08" PRIx32 ".\n\n", date);
+    
     if (out_type) *out_type = type;
-    if (out_size) *out_size = offset;
+    if (out_size) *out_size = signed_cert_size;
     
     return true;
 }

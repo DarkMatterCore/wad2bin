@@ -24,13 +24,13 @@
 #ifndef __TMD_H__
 #define __TMD_H__
 
-#include "signature.h"
+#include "cert.h"
 #include "crypto.h"
 
-#define TMD_MIN_SIZE                0x108   /* Equivalent to sizeof(TmdSigHmac160) + sizeof(TmdContentRecord) */
 #define TMD_MAX_CONTENT_COUNT       512
-#define TMD_COMMON_BLOCK_SIZE(x)    (sizeof(TmdCommonBlock) + ((x)->content_count * sizeof(TmdContentRecord)))
-#define TMD_CONTENTS(x)             ((TmdContentRecord*)(((u8*)(x)) + sizeof(TmdCommonBlock)))
+
+#define SIGNED_TMD_MAX_SIZE         (u64)(sizeof(TmdSigRsa4096) + (TMD_MAX_CONTENT_COUNT * sizeof(TmdContentRecord)))
+#define SIGNED_TMD_MIN_SIZE         (u64)(sizeof(TmdSigHmac160) + sizeof(TmdContentRecord))
 
 #define TMD_TARGET_SYSTEM_STR(x)    ((x) == TmdTargetSystem_Wii ? "Wii" : ((x) == TmdTargetSystem_vWii ? "vWii" : "Unknown"))
 #define TMD_CONTENT_REC_TYPE_STR(x) ((x) == TmdContentRecordType_Normal ? "Normal" : ((x) == TmdContentRecordType_DLC ? "DLC" : ((x) == TmdContentRecordType_Shared ? "Shared" : "Unknown")))
@@ -62,22 +62,9 @@ typedef enum {
     TmdAccessRights_DriveInterface = BIT(1)
 } TmdAccessRights;
 
-typedef enum {
-    TmdContentRecordType_Normal = 0x0001,
-    TmdContentRecordType_DLC    = 0x4001,
-    TmdContentRecordType_Shared = 0x8001
-} TmdContentRecordType;
-
+/// Placed after the TMD signature block.
 typedef struct {
-    u32 content_id;
-    u16 index;
-    u16 type;                   ///< TmdContentRecordType.
-    u64 size;
-    u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
-} PACKED TmdContentRecord;
-
-/// Placed after the ticket signature block.
-typedef struct {
+    char issuer[0x40];
     u8 tmd_version;
     u8 ca_crl_version;
     u8 signer_crl_version;
@@ -99,9 +86,25 @@ typedef struct {
     u8 reserved_4[0x02];
 } PACKED TmdCommonBlock;
 
+typedef enum {
+    TmdContentRecordType_Normal = 0x0001,
+    TmdContentRecordType_DLC    = 0x4001,
+    TmdContentRecordType_Shared = 0x8001
+} TmdContentRecordType;
+
+/// Placed after the TMD common block.
+typedef struct {
+    u32 content_id;
+    u16 index;
+    u16 type;                   ///< TmdContentRecordType.
+    u64 size;
+    u8 hash[SHA1_HASH_SIZE];    ///< SHA-1 hash.
+} PACKED TmdContentRecord;
+
 typedef struct {
     SignatureBlockRsa4096 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigRsa4096;
 
 typedef struct {
@@ -112,27 +115,70 @@ typedef struct {
 typedef struct {
     SignatureBlockEcc480 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigEcc480;
 
 typedef struct {
     SignatureBlockHmac160 sig_block;    ///< sig_type field is stored using big endian byte order.
     TmdCommonBlock tmd_common_block;
+    TmdContentRecord tmd_contents[];    ///< C99 flexible array.
 } TmdSigHmac160;
 
+/// Used to store TMD type, size and raw data.
+typedef struct {
+    u8 type;        ///< TmdType.
+    u64 size;       ///< Raw TMD size.
+    bool valid_sig; ///< Determines if the TMD signature is valid or not.
+    u8 *data;       ///< Raw TMD data.
+} TitleMetadata;
+
 /// Reads a TMD from a file and validates its signature size.
-u8 *tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size);
+bool tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size, TitleMetadata *out_tmd, CertificateChain *chain);
 
-/// Returns a pointer to the common TMD block from a TMD stored in a memory buffer.
-/// Optionally, it also saves the TMD type to an input pointer if provided.
-TmdCommonBlock *tmdGetCommonBlockFromBuffer(void *buf, u64 buf_size, u8 *out_tmd_type);
+/// Fakesigns a TMD.
+void tmdFakesignTitleMetadata(TitleMetadata *tmd);
 
-/// Check the system version field from a common TMD block to determine if it references an IOS version.
-bool tmdIsSystemVersionValid(TmdCommonBlock *tmd_common_block);
+/// Helper inline functions.
 
-/// Fakesigns a TMD stored in a buffer.
-void tmdFakesignTitleMetadata(void *buf, u64 buf_size);
+ALWAYS_INLINE void tmdFreeTitleMetadata(TitleMetadata *tmd)
+{
+    if (!tmd) return;
+    if (tmd->data) free(tmd->data);
+    memset(tmd, 0, sizeof(TitleMetadata));
+}
 
-/// Byteswaps fields from a TMD content record.
+ALWAYS_INLINE TmdCommonBlock *tmdGetCommonBlock(void *buf)
+{
+    return (TmdCommonBlock*)signatureGetPayload(buf);
+}
+
+ALWAYS_INLINE TmdContentRecord *tmdGetTitleMetadataContentRecords(TmdCommonBlock *tmd_common_block)
+{
+    return (tmd_common_block != NULL ? (TmdContentRecord*)((u8*)tmd_common_block + sizeof(TmdCommonBlock)) : NULL);
+}
+
+ALWAYS_INLINE bool tmdIsValidTitleMetadata(void *buf)
+{
+    TmdCommonBlock *tmd_common_block = tmdGetCommonBlock(buf);
+    u16 content_count = bswap_16(tmd_common_block->content_count);
+    return (tmd_common_block != NULL && content_count <= TMD_MAX_CONTENT_COUNT);
+}
+
+ALWAYS_INLINE u64 tmdGetTitleMetadataContentRecordsBlockSize(TmdCommonBlock *tmd_common_block)
+{
+    return (u64)(tmd_common_block != NULL ? (bswap_16(tmd_common_block->content_count) * sizeof(TmdContentRecord)) : 0);
+}
+
+ALWAYS_INLINE u64 tmdGetSignedTitleMetadataSize(void *buf)
+{
+    return (tmdIsValidTitleMetadata(buf) ? (signatureGetBlockSize(signatureGetSigType(buf)) + (u64)sizeof(TmdCommonBlock) + tmdGetTitleMetadataContentRecordsBlockSize(tmdGetCommonBlock(buf))) : 0);
+}
+
+ALWAYS_INLINE u64 tmdGetSignedTitleMetadataHashAreaSize(void *buf)
+{
+    return (tmdIsValidTitleMetadata(buf) ? ((u64)sizeof(TmdCommonBlock) + tmdGetTitleMetadataContentRecordsBlockSize(tmdGetCommonBlock(buf))) : 0);
+}
+
 ALWAYS_INLINE void tmdByteswapTitleMetadataContentRecordFields(TmdContentRecord *content_record)
 {
     if (!content_record || IS_BIG_ENDIAN) return;

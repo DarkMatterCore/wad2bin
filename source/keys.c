@@ -496,7 +496,8 @@ static bool keysReadDeviceCertificateFromFile(const os_char_t *device_cert_path)
     u32 sig_type = 0, pub_key_type = 0;
     u32 console_id = keysGetConsoleId();
     char cert_name[0x10] = {0};
-    const char ms_issuer[] = "Root-CA00000001-MS00000002";
+    const char ms_issuer_retail[] = "Root-CA00000001-MS00000002";
+    const char ms_issuer_debug[] = "Root-CA00000002-MS00000003";
     
     /* Read device certificate file. */
     if (!utilsReadDataFromFile(device_cert_path, &g_deviceCert, sizeof(CertSigEcc480PubKeyEcc480)))
@@ -515,7 +516,8 @@ static bool keysReadDeviceCertificateFromFile(const os_char_t *device_cert_path)
     }
     
     /* Verify device certificate signature issuer. */
-    if (strlen(g_deviceCert.sig_block.issuer) != strlen(ms_issuer) || strcmp(g_deviceCert.sig_block.issuer, ms_issuer) != 0)
+    if (strlen(g_deviceCert.cert_common_block.issuer) != strlen(ms_issuer_retail) || (strcmp(g_deviceCert.cert_common_block.issuer, ms_issuer_retail) != 0 && \
+        strcmp(g_deviceCert.cert_common_block.issuer, ms_issuer_debug) != 0))
     {
         ERROR_MSG("Invalid device certificate signature issuer!");
         return false;

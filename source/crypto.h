@@ -26,10 +26,16 @@
 
 #include <mbedtls/aes.h>
 #include <mbedtls/sha1.h>
+#include <mbedtls/sha256.h>
 #include <mbedtls/md5.h>
+#include <mbedtls/rsa.h>
 
 #ifndef SHA1_HASH_SIZE
 #define SHA1_HASH_SIZE      20
+#endif
+
+#ifndef SHA256_HASH_SIZE
+#define SHA256_HASH_SIZE    32
 #endif
 
 #ifndef MD5_HASH_SIZE
@@ -46,7 +52,10 @@
 
 #define ECC_PRIV_KEY_SIZE   32
 #define ECC_PUB_KEY_SIZE    64
-#define ECSDA_SIG_SIZE      64
+#define ECDSA_SIG_SIZE      64
+
+#define RSA2048_SIG_SIZE    0x100
+#define RSA4096_SIG_SIZE    0x200
 
 /// Used to hold AES-128-CBC crypto status.
 typedef struct {
@@ -63,15 +72,25 @@ bool cryptoAes128CbcContextCrypt(CryptoAes128CbcContext *ctx, void *dst, const v
 /// Simple all-in-one AES-128-CBC crypto function.
 bool cryptoAes128CbcCrypt(const void *key, const void *iv, void *dst, const void *src, u64 size, bool encrypt);
 
-/// Generates an ECSDA signature using the provided ECC private key.
-/// Takes care of handling key/signature padding when needed. If padded_sig is true, the output signature will include the two extra bytes before each coordinate.
-void cryptoGenerateEcsdaSignatureWithData(const void *private_key, void *dst, const void *src, u64 size, bool padded_sig);
+/// Generates an ECDSA signature using the provided ECC private key and a variable length hash.
+/// Takes care of padding the input private key.
+/// If padded_sig is true, the output signature will be padded with leading zeroes before each coordinate.
+void cryptoGenerateEcdsaSignature(const void *private_key, void *dst, bool padded_sig, const void *data_hash, u64 data_hash_size);
 
-/// Same as cryptoGenerateEcsdaSignatureWithData, but takes an input SHA-1 hash instead of calculating it on its own over a provided memory block.
-void cryptoGenerateEcsdaSignatureWithHash(const void *private_key, void *dst, const u8 data_hash[SHA1_HASH_SIZE], bool padded_sig);
+/// Verifies an ECDSA signature using the provided ECC public key and a variable length hash.
+/// Takes care of padding the input public key.
+/// If padded_sig is false, the input signature will be padded with leading zeroes before each coordinate.
+/// data_hash must point to a buffer with a size of at least data_hash_size.
+bool cryptoVerifyEcdsaSignature(const void *public_key, const void *signature, bool padded_sig, const void *data_hash, u64 data_hash_size);
 
-/// Generates an ECC public key using the provided ECC private key.
-/// Takes care of handling key padding when needed. The generated key can be used in AP certificates.
+/// Generates an ECC shared secret using an input ECC private key.
+/// Takes care of padding the input private key.
+/// Output public key will always be trimmed/unpadded.
 void cryptoGenerateEccPublicKey(const void *private_key, void *dst);
+
+/// Verifies a RSA-2048 or RSA-4906 signature using the provided RSA public key (modulus) and public exponent, as well as a variable length hash.
+/// public_key_size must be set to either RSA2048_SIG_SIZE or RSA4096_SIG_SIZE, and signature must point to a buffer with a size of at least public_key_size.
+/// data_hash_size must be set to either SHA1_HASH_SIZE or SHA256_HASH_SIZE, and data_hash must point to a buffer with a size of at least data_hash_size.
+bool cryptoVerifyRsaSignature(const void *public_key, u64 public_key_size, u64 public_exponent, const void *signature, const void *data_hash, u64 data_hash_size);
 
 #endif /* __CRYPTO_H__ */

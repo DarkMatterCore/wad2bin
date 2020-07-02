@@ -38,28 +38,66 @@ typedef struct {
     u32 sig_type;           ///< SignatureType_Rsa4096Sha1, SignatureType_Rsa4096Sha256.
     u8 signature[0x200];
     u8 padding[0x3C];
-    char issuer[0x40];
 } SignatureBlockRsa4096;
 
 typedef struct {
     u32 sig_type;           ///< SignatureType_Rsa2048Sha1, SignatureType_Rsa2048Sha256.
     u8 signature[0x100];
     u8 padding[0x3C];
-    char issuer[0x40];
 } SignatureBlockRsa2048;
 
 typedef struct {
     u32 sig_type;           ///< SignatureType_Ecc480Sha1, SignatureType_Ecc480Sha256.
     u8 signature[0x3C];
     u8 padding[0x40];
-    char issuer[0x40];
 } SignatureBlockEcc480;
 
 typedef struct {
     u32 sig_type;           ///< SignatureType_Hmac160Sha1.
     u8 signature[0x14];
     u8 padding[0x28];
-    char issuer[0x40];
 } SignatureBlockHmac160;
+
+/// Helper inline functions.
+
+ALWAYS_INLINE u32 signatureGetSigType(void *buf)
+{
+    return (buf ? bswap_32(*((u32*)buf)) : 0);
+}
+
+ALWAYS_INLINE bool signatureIsValidSigType(u32 type)
+{
+    return (type == SignatureType_Rsa4096Sha1   || type == SignatureType_Rsa2048Sha1   || type == SignatureType_Ecc480Sha1   || \
+            type == SignatureType_Rsa4096Sha256 || type == SignatureType_Rsa2048Sha256 || type == SignatureType_Ecc480Sha256 || \
+            type == SignatureType_Hmac160Sha1);
+}
+
+ALWAYS_INLINE u8 *signatureGetSig(void *buf)
+{
+    return (buf ? ((u8*)buf + 4) : NULL);
+}
+
+ALWAYS_INLINE u64 signatureGetSigSize(u32 type)
+{
+    return (u64)((type == SignatureType_Rsa4096Sha1 || type == SignatureType_Rsa4096Sha256) ? MEMBER_SIZE(SignatureBlockRsa4096, signature) : \
+                ((type == SignatureType_Rsa2048Sha1 || type == SignatureType_Rsa2048Sha256) ? MEMBER_SIZE(SignatureBlockRsa2048, signature) : \
+                ((type == SignatureType_Ecc480Sha1  || type == SignatureType_Ecc480Sha256)  ? MEMBER_SIZE(SignatureBlockEcc480,  signature) : \
+                 (type == SignatureType_Hmac160Sha1                                         ? MEMBER_SIZE(SignatureBlockHmac160, signature) : 0))));
+}
+
+ALWAYS_INLINE u64 signatureGetBlockSize(u32 type)
+{
+    return (u64)((type == SignatureType_Rsa4096Sha1 || type == SignatureType_Rsa4096Sha256) ? sizeof(SignatureBlockRsa4096) : \
+                ((type == SignatureType_Rsa2048Sha1 || type == SignatureType_Rsa2048Sha256) ? sizeof(SignatureBlockRsa2048) : \
+                ((type == SignatureType_Ecc480Sha1  || type == SignatureType_Ecc480Sha256)  ? sizeof(SignatureBlockEcc480)  : \
+                 (type == SignatureType_Hmac160Sha1                                         ? sizeof(SignatureBlockHmac160) : 0))));
+}
+
+ALWAYS_INLINE void *signatureGetPayload(void *buf)
+{
+    if (!buf) return NULL;
+    u32 sig_type = signatureGetSigType(buf);
+    return (signatureIsValidSigType(sig_type) ? (void*)((u8*)buf + signatureGetBlockSize(sig_type)) : NULL);
+}
 
 #endif /* __SIGNATURE_H__ */
