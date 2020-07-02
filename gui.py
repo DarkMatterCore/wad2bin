@@ -332,7 +332,7 @@ class gui(tk.Tk):
 		self.sd_box.place(relwidth=1, height=20, x=0)
 		CreateToolTip(self.sd_box.xtainer, "Select the root of the sd card you wish to install the wads to.")
 
-		self.keys_box = LabeledPathEntry(outer_frame, "Path to keys file -", filetypes=[('keys file', '*.bin')])
+		self.keys_box = LabeledPathEntry(outer_frame, "Path to keys file -", filetypes=[('keys file', '*.txt')])
 		self.keys_box.place(relwidth=1, height=20, x=0, y=30)
 		CreateToolTip(self.keys_box.xtainer, "Path to keys file, this can be dumped from a Wii")
 
