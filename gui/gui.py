@@ -2,8 +2,23 @@
 import os, sys, platform, subprocess, threading
 import tkinter as tk
 import tkinter.filedialog as tkfiledialog
-import style
-from tkinter.ttk import LabelFrame, Style
+from tkinter.ttk import LabelFrame, Notebook
+
+class Style:
+	def __init__(self):
+		self.STANDARD_OFFSET = 10 #Offset to place everything
+		self.BUTTONSIZE = 30
+
+		self.monospace = ("Monospace",10)
+		self.boldmonospace = ("Monospace",10,"bold")
+
+		self.BUTTON_FONT = self.monospace
+		self.BACKGROUND_COLOR = "#20232a"
+		self.BUTTON_COLOR = "#aaaaaa"
+		self.ENTRY_COLOR = "#373940"
+		self.ENTRY_FOREGROUND = "#bbbbbb"
+		self.LABEL_COLOR = "#61dafb"
+style = Style()
 
 class themedFrame(tk.Frame):
 	def __init__(self, frame, **kw):
@@ -57,7 +72,6 @@ class Button(tk.Label):
 
 class PathEntry(tk.Entry):
 	"""Tkinter entry widget with a button to set the file path using tkinter's file dialog"""
-
 	def __init__(self, frame, dir=False, filetypes=None, *args, **kw):
 		self.dir = dir
 		self.filetypes = filetypes
@@ -96,20 +110,48 @@ class PathEntry(tk.Entry):
 		else:
 			self.set(tkfiledialog.askdirectory())
 
-
 class LabeledPathEntry(PathEntry):
 	"""Gives the PathEntry class a label"""
-
 	def __init__(self, frame, text, *args, **kw):
 		self.xtainer = themedFrame(frame)
 		label = tk.Label(self.xtainer, text=text, background=style.BACKGROUND_COLOR, foreground=style.LABEL_COLOR)
 		label.place(width=label.winfo_reqwidth(), relheight=1)
 		PathEntry.__init__(self, self.xtainer, *args, **kw)
-		PathEntry.place(self, relwidth=1, relheight=1, width=- (label.winfo_reqwidth() + 5),
-						x=label.winfo_reqwidth() + 5)
+		PathEntry.place(self, relwidth=1, relheight=1, width=- (label.winfo_reqwidth() + 5), x=label.winfo_reqwidth() + 5)
 
 	def place(self, **kw):
 		self.xtainer.place(**kw)
+
+class LabeledEntry(tk.Entry):
+	"""Tkinter entry widget with a button to set the file path using tkinter's file dialog"""
+	def __init__(self, frame, text, *args, **kw):
+		self.container = themedFrame(frame)
+		label = tk.Label(self.container, text=text, background=style.BACKGROUND_COLOR, foreground=style.LABEL_COLOR)
+		label.place(width=label.winfo_reqwidth(), relheight=1)
+		tk.Entry.__init__(self, self.container, *args, **kw)
+		tk.Entry.place(self, relwidth=1, relheight=1, width=- (label.winfo_reqwidth() + 5), x=label.winfo_reqwidth() + 5)
+		self.text_var = tk.StringVar()
+		self.configure(textvariable=self.text_var)
+		self.configure(background=style.ENTRY_COLOR)
+		self.configure(foreground=style.ENTRY_FOREGROUND)
+		self.configure(borderwidth=0)
+		self.configure(highlightthickness=2)
+		self.configure(highlightbackground=style.BUTTON_COLOR)
+
+	def clear(self):
+		self.text_var.set("")
+
+	def set(self, string):
+		self.text_var.set(string)
+
+	def get_var(self):
+		return self.text_var
+
+	def get(self):
+		return self.text_var.get()
+
+	def place(self, **kw):
+		self.container.place(**kw)
 
 
 class AutoScroll(object):
@@ -219,13 +261,8 @@ class ScrolledText(AutoScroll, tk.Text):
 
 
 # from https://stackoverflow.com/questions/3221956/how-do-i-display-tooltips-in-tkinter
-
-
 class CreateToolTip(object):
-	'''
-	create a tooltip for a given widget
-	'''
-
+	'''Creates a tooltip for a passed widget'''
 	def __init__(self, widget, text='widget info'):
 		self.widget = widget
 		self.text = text
@@ -239,9 +276,9 @@ class CreateToolTip(object):
 		y += self.widget.winfo_rooty() + 20
 		# creates a toplevel window
 		self.tw = tk.Toplevel(self.widget)
-		# Leaves only the label and removes the app window
+		# removes the window frame
 		self.tw.wm_overrideredirect(True)
-		self.tw.wm_geometry("+%d+%d" % (x, y))
+		self.tw.wm_geometry(f"+{x}+{y}")
 		label = tk.Label(self.tw, text=self.text, justify='left',
 						 background='gray', foreground=style.LABEL_COLOR,
 						 relief='solid', borderwidth=2,
@@ -250,8 +287,7 @@ class CreateToolTip(object):
 		label.pack(ipadx=1)
 
 	def close(self, event=None):
-		if self.tw:
-			self.tw.destroy()
+		if self.tw: self.tw.destroy()
 
 """an object to be declared outside of tk root so
 	things can be called asyncronously (you cannot start
@@ -277,13 +313,11 @@ class threader_object:
 	def clear_dead(self):
 		self.threads = [t for t in self.threads if t.is_alive()]
 
-
 class gui(tk.Tk):
 	def __init__(self, threader):
 		self.threader = threader
 		tk.Tk.__init__(self)
-		self.minsize(300, 400)
-		self.title("wad2bin gui")
+
 		self.f = themedFrame(self)
 		self.f.place(relwidth=1, relheight=1)
 
@@ -291,11 +325,13 @@ class gui(tk.Tk):
 		outer_frame.place(relwidth=1, relheight=1, x=+ style.STANDARD_OFFSET, width=- 2 * style.STANDARD_OFFSET,
 						  y=+ style.STANDARD_OFFSET, height=- 2 * style.STANDARD_OFFSET)
 
+		self.minsize(300, 400)
+		self.title("wad2bin gui")
+
 		self.sd_box = LabeledPathEntry(outer_frame, "Path to SD root -", dir=True)
 		self.sd_box.place(relwidth=1, height=20, x=0)
 		CreateToolTip(self.sd_box.xtainer, "Select the root of the sd card you wish to install the wads to.")
 
-		print("TODO: KEYS FILE TYPE")
 		self.keys_box = LabeledPathEntry(outer_frame, "Path to keys file -", filetypes=[('keys file', '*.bin')])
 		self.keys_box.place(relwidth=1, height=20, x=0, y=30)
 		CreateToolTip(self.keys_box.xtainer, "Path to keys file, this can be dumped from a Wii")
@@ -304,21 +340,28 @@ class gui(tk.Tk):
 		self.cert_box.place(relwidth=1, height=20, x=0, y=60)
 		CreateToolTip(self.cert_box.xtainer, "Select the path to device.cert, this can be dumped from a Wii")
 
+		self.tid_box = LabeledEntry(outer_frame, "Parent TID [DLC Only] -")
+		self.tid_box.place(relwidth=1, height=20, x=0, y=90)
+		CreateToolTip(self.tid_box.container, """Notes about DLC support:
+* Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
+* If "--nullkey" is set after the parent title ID, a null key will be used to encrypt DLC content data.
+  Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.""")
+
 		# -------------------------------------------------
 		container = themedFrame(outer_frame, borderwidth=0, highlightthickness=0)
-		container.place(y=85, relwidth=1, height=170)
+		container.place(y=115, relwidth=1, height=140)
 
 		path_label = tk.Label(container, text=" - Wad Paths - ", foreground=style.LABEL_COLOR,
 							 background=style.BACKGROUND_COLOR)
 		path_label.place(relwidth=1, height=20)
 		self.path_box = tk.Listbox(container, highlightthickness=0, bg=style.ENTRY_COLOR,
 								  foreground=style.ENTRY_FOREGROUND)
-		self.path_box.place(relwidth=1, height=115, y=20)
+		self.path_box.place(relwidth=1, height=85, y=20)
 		CreateToolTip(path_label,
 					  "Select the wads you wish to install to the sd card. The `add folder` button will add all wads in the selected folder, but will not check subdirs. The `remove wad` button will remove the currently selected file from the listbox.")
 
 		button_container = themedFrame(container)
-		button_container.place(y = 140, relwidth = 1, height = 20)
+		button_container.place(y = 110, relwidth = 1, height = 20)
 
 		self.add_button = Button(button_container, self.add, text="add wad", font=style.monospace)
 		self.add_button.place(relx=0, relwidth=0.333, height=20, width=- 6)
@@ -341,49 +384,44 @@ class gui(tk.Tk):
 	def run(self):
 		self.output_to_console("\n\n-----------------------\nStarting...\n")
 
-		length = 0
-
-		keys = self.keys_box.get()
-		if not keys:
-			self.output_to_console("Keys file not selected, can't continue.\n")
-			return
-		length += len(keys)
-
-		cert = self.cert_box.get()
-		if not cert:
-			self.output_to_console("Failed to run - No cert selected.\n")
-			return
-		length += len(cert)
-
-		sd = self.sd_box.get().strip()
-		if not sd:
-			self.output_to_console("Failed to run - SD path not selected.\n")
-			return
-		length += len(sd)
-
-		if platform.system() == "Windows":
-			pass #Default for now
-		elif platform.system() in "Darwin":
+		system = platform.system()
+		if system == "Windows":
+			pass #Default for now, no errors
+		elif system == "Darwin":
 			self.output_to_console("MacOS is not supported yet but may be in the future.\n")
 			return
-		else: #Linux
-			self.output_to_console("Your OS not supported yet but may be in the future.\n")
-			return
-		
-		wads = []
-		for i in range(0, self.path_box.size()):
-			path = self.path_box.get(i).strip()
-			length += len(path)
-			wads.append(path)
-
-		if (length + len("wad2bin.exe ") + 5) > 1024:
-			self.output_to_console("Failed to run - SD path not selected.\n")
+		else: #Linux, etc
+			self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
 			return
 
 		script = os.path.realpath("wad2bin.exe")
+
+		sd = self.sd_box.get().strip()
+		if not sd:
+			self.output_to_console("Output path (SD Card) not selected.\n")
+			return
+
+		keys = self.keys_box.get().strip()
+		if not keys:
+			self.output_to_console("No keys.bin provided, this can be dumped from your Wii\n")
+			return
+
+		cert = self.cert_box.get().strip()
+		if not cert:
+			self.output_to_console("No device.cert provided, this can be dumped from your Wii\n")
+			return
+	
+		tid = self.tid_box.get().strip()
+
+		wads = []
+		for i in range(0, self.path_box.size()):
+			path = self.path_box.get(i).strip()
+			wads.append(path)
+
 		def process_wads(wadlist):
 			for wad in wadlist:
-				self.threader.do_async(execute_script, [[script, keys, cert, wad, sd], self.output_to_console])
+				execlist = [script, keys, cert, wad, sd, tid] if tid else [script, keys, cert, wad, sd]
+				self.threader.do_async(execute_script, [execlist, self.output_to_console])
 				self.threader.join() #Wait til complete to start next
 
 		if wads:
@@ -396,7 +434,7 @@ class gui(tk.Tk):
 			finally:
 				self.enable()
 		else:
-			self.output_to_console("No wads selected.")
+			self.output_to_console("No wads selected.\n")
 
 	def output_to_console(self, outstring):
 		self.console.insert('end', outstring)
@@ -463,7 +501,6 @@ def execute_script(args, printer):
 	p.wait()
 	# except Exception as e:
 	# 	printer(f"Error while executing script with path - {wad_paths} | Exception - {e}\n")
-
 
 t = threader_object()
 window = gui(t)
