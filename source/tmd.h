@@ -160,8 +160,7 @@ ALWAYS_INLINE TmdContentRecord *tmdGetTitleMetadataContentRecords(TmdCommonBlock
 ALWAYS_INLINE bool tmdIsValidTitleMetadata(void *buf)
 {
     TmdCommonBlock *tmd_common_block = tmdGetCommonBlock(buf);
-    u16 content_count = bswap_16(tmd_common_block->content_count);
-    return (tmd_common_block != NULL && content_count <= TMD_MAX_CONTENT_COUNT);
+    return (tmd_common_block != NULL && bswap_16(tmd_common_block->content_count) <= TMD_MAX_CONTENT_COUNT);
 }
 
 ALWAYS_INLINE u64 tmdGetTitleMetadataContentRecordsBlockSize(TmdCommonBlock *tmd_common_block)
