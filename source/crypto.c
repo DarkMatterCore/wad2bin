@@ -20,6 +20,7 @@
  */
 
 #include <ninty-233.h>
+#include <mbedtls/rsa.h>
 
 #include "utils.h"
 #include "crypto.h"

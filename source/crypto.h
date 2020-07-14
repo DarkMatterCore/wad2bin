@@ -28,7 +28,6 @@
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/md5.h>
-#include <mbedtls/rsa.h>
 
 #ifndef SHA1_HASH_SIZE
 #define SHA1_HASH_SIZE      20

@@ -144,7 +144,7 @@ Dependencies:
 --------------
 
 * [ninty-233](https://github.com/jbop1626/ninty-233) (licensed under GPLv3 or later) is used for ECDH data generation and ECDSA signing/verification.
-* [mbedtls](https://tls.mbed.org) (licensed under Apache 2.0) is used for hash calculation and AES-CBC crypto operations.
+* [mbedtls](https://tls.mbed.org) (licensed under Apache 2.0) is used for hash calculations, AES-CBC crypto operations and RSA signature verification.
 * Keydata parsing based on code from [hactool](https://github.com/SciresM/hactool) (licensed under ISC).
 
 License:
