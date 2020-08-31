@@ -1,4 +1,12 @@
 TOPDIR	?=	$(CURDIR)
+ifeq ($(strip $(wildcard $(TOPDIR)/config.mk)),)
+# config.mk does not exist.
+# read template and safe as config.mk
+$(info Creating config.mk file)
+
+$(file > config.mk,$(file < config.mk.template))
+endif
+
 include $(TOPDIR)/config.mk
 
 PROJECT_NAME	:=	wad2bin
