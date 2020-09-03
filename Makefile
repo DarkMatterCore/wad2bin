@@ -1,15 +1,35 @@
 TOPDIR	?=	$(CURDIR)
+ifeq ($(strip $(wildcard $(TOPDIR)/config.mk)),)
+# config.mk does not exist.
+# read template and safe as config.mk
+$(info Creating config.mk file)
+
+$(file > config.mk,$(file < config.mk.template))
+endif
+
 include $(TOPDIR)/config.mk
 
 PROJECT_NAME	:=	wad2bin
+ifeq ($(strip $(findstring Windows,$(shell uname -s))),)
+TARGET			:=	$(PROJECT_NAME)
+else
 TARGET			:=	$(PROJECT_NAME)$(EXEEXT)
+endif
+
+# allow static build
+BUILD_STATIC ?= 0
 
 # -Wno-implicit-fallthrough is used to suppress ConvertUTF.c warnings.
 # -Wno-missing-braces is used to suppress "suggest braces around initialization of subobject" warnings under certain compilers.
+
 CFLAGS			:=	-std=gnu11 -fPIC -O2 -Wall -Wextra -Wpedantic -Wno-implicit-fallthrough -Wno-missing-braces -static-libgcc -static-libstdc++ $(INCLUDE)
+LIBS			:=	-lmbedtls -lmbedx509 -lmbedcrypto -lninty-233
+ifeq ($(BUILD_STATIC),1)
+CFLAGS			+= 	-static -s
+LIBS			+= 	-static -s
+endif
 CFLAGS			+=	-D_BSD_SOURCE -D_POSIX_SOURCE -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -D_FILE_OFFSET_BITS=64
 
-LIBS			:=	-lmbedtls -lmbedx509 -lmbedcrypto -lninty-233
 
 BUILD			:=	build
 SOURCES			:=	source
