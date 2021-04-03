@@ -6,9 +6,6 @@ on:
       - master
       - action
 
-strategy:
-  matrix:
-    compiler: [gcc]
 jobs:
   Build:
     runs-on: ${{ matrix.os }}
