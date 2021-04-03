@@ -23,7 +23,6 @@ jobs:
             else
                 cp config.mk.template config.mk
             fi
-            |
     - name: Set up Python 3
       uses: actions/setup-python@v1
       with:
