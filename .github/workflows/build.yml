@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+      - action
+
+jobs:
+  Build:
+    runs-on: ${{ matrix.os }}
+    compiler: gcc
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macOS-latest]
+
+    steps:
+    - name: Obtain latest version of the repository
+      uses: actions/checkout@v1
+    - name: Compile wad2bin
+      run: cp config.mk.template config.mk
+    - name: Set up Python 3
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.9'
+    - name: Install requirements with PIP
+      run: pip install -r requirements.txt
+    - name: Install pyinstaller
+      run: pip install pyinstaller
+    - name: Build wad2bin GUI
+      run: pyinstaller wad2bin-gui.spec
+    - name: Publish Build Artifacts
+      uses: actions/upload-artifact@master
+      with:
+        name: ${{ matrix.os }}
+        path: dist

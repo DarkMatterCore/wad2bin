@@ -393,16 +393,19 @@ class gui(tk.Tk):
 		self.output_to_console("\n\n-----------------------\nStarting...\n")
 
 		system = platform.system()
-		if system == "Windows":
-			pass #Default for now, no errors
-		elif system == "Darwin":
-			self.output_to_console("MacOS is not supported yet but may be in the future.\n")
-			return
-		else: #Linux, etc
-			self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
-			return
+		#if system == "Windows":
+		#	pass #Default for now, no errors
+		#elif system == "Darwin":
+		#	self.output_to_console("MacOS is not supported yet but may be in the future.\n")
+		#	return
+		#else: #Linux, etc
+		#	self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
+		#	return
 
-		script = os.path.realpath("wad2bin.exe")
+		try:
+			script = os.path.realpath("wad2bin.exe")
+		except:
+			script = os.path.realpath("wad2bin")
 		if len(script) > 259:
 			self.output_to_console("Script path too long, must be less than 259 characters")
 			return
