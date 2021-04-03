@@ -24,6 +24,7 @@ jobs:
                 cp config.mk.template config.mk
             fi
             make
+      shell: bash
     - name: Set up Python 3
       uses: actions/setup-python@v1
       with:
