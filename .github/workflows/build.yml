@@ -17,13 +17,14 @@ jobs:
     - name: Obtain latest version of the repository
       uses: actions/checkout@v1
     - name: Compile wad2bin
-      run: cp config.mk.template config.mk
+      uses: canastro/copy-file-action@master
+      with:
+        source: "config.mk.template"
+        target: "config.mk"
     - name: Set up Python 3
       uses: actions/setup-python@v1
       with:
         python-version: '3.9'
-    - name: Install requirements with PIP
-      run: pip install -r requirements.txt
     - name: Install pyinstaller
       run: pip install pyinstaller
     - name: Build wad2bin GUI
