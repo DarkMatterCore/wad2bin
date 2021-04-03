@@ -18,11 +18,7 @@ jobs:
       uses: actions/checkout@v1
     - name: Compile wad2bin
       run: |
-            if [ "$RUNNER_OS" == "Windows" ]; then
-                copy config.mk.template config.mk
-            else
-                cp config.mk.template config.mk
-            fi
+            cp config.mk.template config.mk
             make
       shell: bash
     - name: Set up Python 3
