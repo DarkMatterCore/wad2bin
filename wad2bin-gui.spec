@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['gui.py'],
              binaries=[],
-             datas=[],
+             datas=[('wad2*', './')],
              hiddenimports=['tkinter'],
              hookspath=[],
              runtime_hooks=[],

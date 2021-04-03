@@ -401,11 +401,10 @@ class gui(tk.Tk):
 		#else: #Linux, etc
 		#	self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
 		#	return
-
-		try:
-			script = os.path.realpath("wad2bin.exe")
-		except:
-			script = os.path.realpath("wad2bin")
+		if system == "Windows":
+			script = "wad2bin.exe"
+		else:
+			script = "wad2bin"
 		if len(script) > 259:
 			self.output_to_console("Script path too long, must be less than 259 characters")
 			return

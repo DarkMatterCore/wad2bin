@@ -20,7 +20,15 @@ jobs:
       run: |
             cp config.mk.template config.mk
             make
+            if [ "$RUNNER_OS" == "Windows" ]; then
+                mv wad2bin wad2bin.exe
+            fi
       shell: bash
+    - name: Publish Build Artifacts for CLI app
+      uses: actions/upload-artifact@master
+      with:
+        name: wad2bin-${{ matrix.os }}
+        path: wad2*
     - name: Set up Python 3
       uses: actions/setup-python@v1
       with:
@@ -29,8 +37,8 @@ jobs:
       run: pip install pyinstaller
     - name: Build wad2bin GUI
       run: pyinstaller wad2bin-gui.spec
-    - name: Publish Build Artifacts
+    - name: Publish Build Artifacts for GUI app
       uses: actions/upload-artifact@master
       with:
-        name: ${{ matrix.os }}
+        name: wad2bin-gui-${{ matrix.os }}
         path: dist
