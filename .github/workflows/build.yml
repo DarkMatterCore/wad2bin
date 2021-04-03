@@ -6,10 +6,12 @@ on:
       - master
       - action
 
+strategy:
+  matrix:
+    compiler: [gcc]
 jobs:
   Build:
     runs-on: ${{ matrix.os }}
-    compiler: gcc
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macOS-latest]
