@@ -17,10 +17,12 @@ jobs:
     - name: Obtain latest version of the repository
       uses: actions/checkout@v1
     - name: Compile wad2bin
-      uses: canastro/copy-file-action@master
-      with:
-        source: "config.mk.template"
-        target: "config.mk"
+      run: |
+            if [ "$RUNNER_OS" == "Windows" ]; then
+                copy config.mk.template config.mk
+            else
+                cp config.mk.template config.mk
+            |
     - name: Set up Python 3
       uses: actions/setup-python@v1
       with:
