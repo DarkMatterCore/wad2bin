@@ -393,16 +393,15 @@ class gui(tk.Tk):
 		self.output_to_console("\n\n-----------------------\nStarting...\n")
 
 		system = platform.system()
-		if system == "Windows":
-			pass #Default for now, no errors
-		elif system == "Darwin":
-			self.output_to_console("MacOS is not supported yet but may be in the future.\n")
-			return
-		else: #Linux, etc
-			self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
-			return
-
-		script = os.path.realpath("wad2bin.exe")
+		#if system == "Windows":
+		#	pass #Default for now, no errors
+		#elif system == "Darwin":
+		#	self.output_to_console("MacOS is not supported yet but may be in the future.\n")
+		#	return
+		#else: #Linux, etc
+		#	self.output_to_console(f"Your OS ({system}) is not supported yet but may be in the future. If you are interested in testing, create an issue on github and we will see what we can do.\n")
+		#	return
+		script = resource_path("wad2bin")
 		if len(script) > 259:
 			self.output_to_console("Script path too long, must be less than 259 characters")
 			return
@@ -513,9 +512,14 @@ class gui(tk.Tk):
 		self.run_button.configure(state = "normal")
 		self.tid_box.configure(state = "normal")
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 def execute_script(args, printer):
 	p = subprocess.Popen(args,
+		stdin=subprocess.PIPE,
 		stdout=subprocess.PIPE,
 		stderr=subprocess.STDOUT,
 		bufsize=1,
