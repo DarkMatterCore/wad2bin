@@ -424,7 +424,7 @@ static bool keysReadKeysFromFile(const os_char_t *keys_file_path)
     keys_file = os_fopen(keys_file_path, OS_MODE_READ);
     if (!keys_file)
     {
-        ERROR_MSG("Unable to open \"" OS_PRINT_STR "\" to retrieve keys!", keys_file_path);
+        ERROR_MSG("Unable to open \"" OS_PRINT_STR "\" to retrieve keys! (%d).", keys_file_path, errno);
         return false;
     }
     

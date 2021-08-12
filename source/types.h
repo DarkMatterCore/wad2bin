@@ -12,17 +12,22 @@
 
 /// Creates a bitmask from a bit number.
 #ifndef BIT
-#define BIT(n)          (1U << (n))
+#define BIT(n)                  (1U << (n))
 #endif
 
 /// Packs a struct so that it won't include padding bytes.
 #ifndef PACKED
-#define PACKED          __attribute__((packed))
+#define PACKED                  __attribute__((packed))
 #endif
 
 /// Flags a function as (always) inline.
 #ifndef ALWAYS_INLINE
-#define ALWAYS_INLINE   __attribute__((always_inline)) static inline
+#define ALWAYS_INLINE           __attribute__((always_inline)) static inline
+#endif
+
+/// Flags a function as printf-like.
+#ifndef PRINTF_FORMAT
+#define PRINTF_FORMAT(idx, arg) __attribute__((format(gnu_printf, idx, arg)))
 #endif
 
 typedef uint8_t u8;     ///<  8-bit unsigned integer.

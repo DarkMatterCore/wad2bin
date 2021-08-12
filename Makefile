@@ -10,6 +10,9 @@ endif
 include $(TOPDIR)/config.mk
 
 PROJECT_NAME	:=	wad2bin
+PROJECT_AUTHOR	:=	DarkMatterCore
+PROJECT_VERSION	:=	0.8
+
 ifeq ($(strip $(findstring Windows,$(shell uname -s))),)
 TARGET			:=	$(PROJECT_NAME)
 else
@@ -24,12 +27,14 @@ BUILD_STATIC ?= 0
 
 CFLAGS			:=	-std=gnu11 -fPIC -O2 -Wall -Wextra -Wpedantic -Wno-implicit-fallthrough -Wno-missing-braces -static-libgcc -static-libstdc++ $(INCLUDE)
 LIBS			:=	-lmbedtls -lmbedx509 -lmbedcrypto -lninty-233
+
 ifeq ($(BUILD_STATIC),1)
 CFLAGS			+= 	-static -s
 LIBS			+= 	-static -s
 endif
-CFLAGS			+=	-D_BSD_SOURCE -D_POSIX_SOURCE -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -D_FILE_OFFSET_BITS=64
 
+CFLAGS			+=	-D_BSD_SOURCE -D_POSIX_SOURCE -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -D_FILE_OFFSET_BITS=64
+CFLAGS			+=	-DPROJECT_NAME=\"${PROJECT_NAME}\" -DPROJECT_AUTHOR=\"${PROJECT_AUTHOR}\" -DPROJECT_VERSION=\"${PROJECT_VERSION}\"
 
 BUILD			:=	build
 SOURCES			:=	source

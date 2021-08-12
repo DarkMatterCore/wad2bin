@@ -6,10 +6,7 @@ Usage:
 --------------
 
 ```
-wad2bin v0.7 (c) DarkMatterCore.
-Built: 16:57:46 Jul  1 2020.
-
-Usage: wad2bin <keys.txt> <device.cert> <input WAD> <output dir> [<parent title ID> [--nullkey]]
+wad2bin <keys.txt> <device.cert> <input WAD> <output dir> [<parent title ID> [--nullkey]]
 
 Paths must not exceed 259 characters. Relative paths are supported.
 The required directory tree for the *.bin file(s) will be created at the output directory.
@@ -19,8 +16,6 @@ Notes about DLC support:
 * Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.
 * If "--nullkey" is set after the parent title ID, a null key will be used to encrypt DLC content data.
   Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.
-
-For more information, please visit: https://github.com/DarkMatterCore/wad2bin.
 ```
 
 Building instructions:
@@ -28,14 +23,16 @@ Building instructions:
 
 * **Windows** (should you really bother? 32-bit binaries are provided):
     1. A collection of Unix/Linux utilities such as `make`, `mkdir`, `rm`, `ar` and `cp`, as well as a `gnu11` standard compliant C compiler, are needed to build this project. There are a few ways to achieve this under Windows:
-        * Install [TDM-GCC](https://jmeubank.github.io/tdm-gcc/download) and [devkitPro + MSYS2](https://devkitpro.org/wiki/Getting_Started#Windows), or...
+        * Install [TDM-GCC](https://jmeubank.github.io/tdm-gcc/download), or...
+        * Install [devkitPro + MSYS2](https://devkitpro.org/wiki/Getting_Started#Windows):
+            * Install the `gcc` package by using the `pacman -Syu` and `pacman -S gcc` commands.
         * Install [MinGW + MSYS](http://www.mingw.org/wiki/Getting_Started), or...
         * (Untested) Under Windows 10:
             * Install the [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/install-win10) distribution of your preference (I'll assume you chose Ubuntu).
             * Install the `gcc` package by using the `sudo apt update` and `sudo apt install gcc` commands.
             * Modify the Makefiles to use `wsl.exe` before each Unix command call.
         * Regardless of the option you end up choosing, please make sure your `PATH` environment variable has been properly updated!
-    2. Create a copy of `config.mk.template` in the same directory and rename it to `config.mk`.
+    2. Create a copy of `config.mk.template` in the same directory and rename it to `config.mk`. Modify it if you need to change the compiler name/alias.
     3. Build using the `make` command.
 
 * **Unix-like OS (Linux / MacOS)**:
@@ -154,6 +151,11 @@ wad2bin is licensed under GPLv3 or (at your option) any later version.
 
 Changelog:
 --------------
+
+**v0.8:**
+
+* Print `errno` values as part of error messages whenever possible.
+* Use GCC `format` function attribute on `utilsPrintErrorMessage()`. 
 
 **v0.7:**
 

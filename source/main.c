@@ -44,8 +44,8 @@ int main(int argc, char **argv)
     u32 required_ios = 0, tid_upper = 0;
     bool use_null_key = false;
     
-    printf("\nwad2bin v%s (c) DarkMatterCore.\n", VERSION);
-    printf("Built: %s %s.\n\n", __TIME__, __DATE__);
+    printf("\n" PROJECT_NAME " v" PROJECT_VERSION " (c) " PROJECT_AUTHOR ".\n");
+    printf("Built on: %s %s.\n\n", __TIME__, __DATE__);
     
     if (argc < (PATH_COUNT + 1) || argc > (PATH_COUNT + 3) || strlen(argv[1]) >= MAX_PATH || strlen(argv[2]) >= MAX_PATH || strlen(argv[3]) >= MAX_PATH || \
         (strlen(argv[4]) + SD_CONTENT_PATH_MAX_LENGTH) >= MAX_PATH || (argc >= (PATH_COUNT + 2) && strlen(argv[5]) != 16) || (argc == (PATH_COUNT + 3) && (strlen(argv[6]) != strlen(NULL_KEY_ARG) || \
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         printf("* Parent title ID is only required if the input WAD is a DLC. A 16 character long hex string is expected.\n");
         printf("* If \"" NULL_KEY_ARG "\" is set after the parent title ID, a null key will be used to encrypt DLC content data.\n");
         printf("  Some older games (like Rock Band 2) depend on this to properly load DLC data when launched via the Disc Channel.\n\n");
-        printf("For more information, please visit: https://github.com/DarkMatterCore/wad2bin.\n\n");
+        printf("For more information, please visit: https://github.com/" PROJECT_AUTHOR "/" PROJECT_NAME ".\n\n");
         ret = -1;
         goto out;
     }
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
         if (i == PATH_COUNT)
         {
             /* Save temporary path and create it. */
-            os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR "wad2bin_wad_data");
+            os_snprintf(paths[i], MAX_PATH, "." OS_PATH_SEPARATOR PROJECT_NAME "_wad_data");
             os_mkdir(paths[i], 0777);
         } else {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)

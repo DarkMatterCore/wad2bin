@@ -27,8 +27,6 @@
 #include "types.h"
 #include "os.h"
 
-#define VERSION                         "0.7"
-
 /* Supress clang warnings about variadic macro arguments. */
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -67,7 +65,7 @@
 /* "%s" is replaced by the desired filename using *printf functions. */
 #define PRIVATE_PATH(dir)               OS_PATH_SEPARATOR "private" OS_PATH_SEPARATOR "wii" OS_PATH_SEPARATOR dir OS_PATH_SEPARATOR "%s"
 
-void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
+PRINTF_FORMAT(2, 3) void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...);
 
 bool utilsConvertUTF8ToUTF16(os_char_t *dst, const char *src);
 

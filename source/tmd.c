@@ -50,7 +50,7 @@ bool tmdReadTitleMetadataFromFile(FILE *fd, u64 tmd_size, TitleMetadata *out_tmd
     res = fread(out_tmd->data, 1, tmd_size, fd);
     if (res != tmd_size)
     {
-        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long TMD!", tmd_size);
+        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long TMD! (%d).", tmd_size, errno);
         goto out;
     }
     

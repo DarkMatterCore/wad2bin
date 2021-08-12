@@ -176,7 +176,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     opening_bnr = os_fopen(unpacked_wad_path, OS_MODE_READ);
     if (!opening_bnr)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode!", unpacked_wad_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode! (%d).", unpacked_wad_path, errno);
         return false;
     }
     
@@ -184,7 +184,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fread(&cntbin_header, 1, sizeof(BinContentHeader), opening_bnr);
     if (res != sizeof(BinContentHeader))
     {
-        ERROR_MSG("Failed to read IMET header from \"" OS_PRINT_STR "\"!", unpacked_wad_path);
+        ERROR_MSG("Failed to read IMET header from \"" OS_PRINT_STR "\"! (%d).", unpacked_wad_path, errno);
         goto out;
     }
     
@@ -254,7 +254,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     content_bin = os_fopen(out_path, OS_MODE_WRITE);
     if (!content_bin)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode! (%d).", out_path, errno);
         goto out;
     }
     
@@ -301,7 +301,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fwrite(&cntbin_header, 1, sizeof(BinContentHeader), content_bin);
     if (res != sizeof(BinContentHeader))
     {
-        ERROR_MSG("Failed to write encrypted header (Part A) to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write encrypted header (Part A) to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -316,7 +316,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fwrite(icon_bin, 1, icon_bin_size, content_bin);
     if (res != icon_bin_size)
     {
-        ERROR_MSG("Failed to write encrypted icon.bin (Part B) to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write encrypted icon.bin (Part B) to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -361,7 +361,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fwrite(&bk_header, 1, sizeof(WadBackupPackageHeader), content_bin);
     if (res != sizeof(WadBackupPackageHeader))
     {
-        ERROR_MSG("Failed to write plaintext \"Bk\" header (Part C) to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write plaintext \"Bk\" header (Part C) to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -372,7 +372,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fwrite(tmd->data, 1, aligned_tmd_size, content_bin);
     if (res != aligned_tmd_size)
     {
-        ERROR_MSG("Failed to write plaintext TMD (Part D) to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write plaintext TMD (Part D) to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -404,7 +404,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         cnt_fd = os_fopen(unpacked_wad_path, OS_MODE_READ);
         if (!cnt_fd)
         {
-            ERROR_MSG("Failed to open unpacked content \"" OS_PRINT_STR "\" in read mode!", unpacked_wad_path);
+            ERROR_MSG("Failed to open unpacked content \"" OS_PRINT_STR "\" in read mode! (%d).", unpacked_wad_path, errno);
             goto out;
         }
         
@@ -477,7 +477,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     res = fwrite(&cert_area, 1, sizeof(BinContentCertArea), content_bin);
     if (res != sizeof(BinContentCertArea))
     {
-        ERROR_MSG("Failed to write plaintext certificate area (Part F) to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write plaintext certificate area (Part F) to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -578,7 +578,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         cnt_fd = os_fopen(unpacked_wad_path, OS_MODE_READ);
         if (!cnt_fd)
         {
-            printf("Content \"" OS_PRINT_STR "\" not found. Skipping...\n\n", unpacked_wad_path);
+            printf("Content \"" OS_PRINT_STR "\" not found (%d). Skipping...\n\n", unpacked_wad_path, errno);
             continue;
         }
         
@@ -587,7 +587,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         if (!indexed_bin)
         {
             fclose(cnt_fd);
-            ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+            ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode! (%d).", out_path, errno);
             goto out;
         }
         
@@ -624,7 +624,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         {
             fclose(indexed_bin);
             fclose(cnt_fd);
-            ERROR_MSG("Failed to write plaintext \"Bk\" header to \"" OS_PRINT_STR "\"!", out_path);
+            ERROR_MSG("Failed to write plaintext \"Bk\" header to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
             goto out;
         }
         
@@ -634,7 +634,7 @@ bool binGenerateIndexedPackagesFromUnpackedInstallableWadPackage(os_char_t *unpa
         {
             fclose(indexed_bin);
             fclose(cnt_fd);
-            ERROR_MSG("Failed to write plaintext TMD to \"" OS_PRINT_STR "\"!", out_path);
+            ERROR_MSG("Failed to write plaintext TMD to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
             goto out;
         }
         

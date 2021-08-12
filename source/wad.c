@@ -66,7 +66,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     wad_fd = os_fopen(wad_path, OS_MODE_READ);
     if (!wad_fd)
     {
-        ERROR_MSG("Unable to open \"" OS_PRINT_STR "\" for reading!", wad_path);
+        ERROR_MSG("Unable to open \"" OS_PRINT_STR "\" for reading! (%d).", wad_path, errno);
         goto out;
     }
     
@@ -85,7 +85,7 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
     res = fread(&wad_header, 1, sizeof(WadInstallablePackageHeader), wad_fd);
     if (res != sizeof(WadInstallablePackageHeader))
     {
-        ERROR_MSG("Failed to read WAD header from \"" OS_PRINT_STR "\"!", wad_path);
+        ERROR_MSG("Failed to read WAD header from \"" OS_PRINT_STR "\"! (%d).", wad_path, errno);
         goto out;
     }
     
@@ -402,7 +402,7 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
         res = fread(buf, 1, blksize, cnt_fd);
         if (res != blksize)
         {
-            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes plaintext chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"!", blksize, offset, cnt_idx);
+            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes plaintext chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"! (%d).", blksize, offset, cnt_idx, errno);
             goto out;
         }
         
@@ -427,7 +427,7 @@ bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8
         res = fwrite(buf, 1, write_size, wad_fd);
         if (res != write_size)
         {
-            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes encrypted chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"!", write_size, offset, cnt_idx);
+            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes encrypted chunk at offset 0x%" PRIx64 " from content \"%08" PRIx16 ".app\"! (%d).", write_size, offset, cnt_idx, errno);
             goto out;
         }
         
@@ -479,7 +479,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *c
     wad_fd = os_fopen(out_path, OS_MODE_WRITE);
     if (!wad_fd)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode! (%d).", out_path, errno);
         goto out;
     }
     
@@ -498,7 +498,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *c
     res = fwrite(&wad_header, 1, sizeof(WadInstallablePackageHeader), wad_fd);
     if (res != sizeof(WadInstallablePackageHeader))
     {
-        ERROR_MSG("Failed to write installable WAD header to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write installable WAD header to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -506,7 +506,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *c
     res = fwrite(cert_chain->raw_chain, 1, aligned_cert_chain_size, wad_fd);
     if (res != aligned_cert_chain_size)
     {
-        ERROR_MSG("Failed to write certificate chain to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write certificate chain to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -514,7 +514,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *c
     res = fwrite(ticket->data, 1, aligned_ticket_size, wad_fd);
     if (res != aligned_ticket_size)
     {
-        ERROR_MSG("Failed to write ticket to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write ticket to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -522,7 +522,7 @@ bool wadGenerateBogusInstallablePackage(os_char_t *out_path, CertificateChain *c
     res = fwrite(tmd->data, 1, aligned_tmd_size, wad_fd);
     if (res != aligned_tmd_size)
     {
-        ERROR_MSG("Failed to write TMD to \"" OS_PRINT_STR "\"!", out_path);
+        ERROR_MSG("Failed to write TMD to \"" OS_PRINT_STR "\"! (%d).", out_path, errno);
         goto out;
     }
     
@@ -589,7 +589,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
     cnt_fd = os_fopen(out_path, OS_MODE_WRITE);
     if (!cnt_fd)
     {
-        ERROR_MSG("Failed to open content file in write mode!");
+        ERROR_MSG("Failed to open content file in write mode! (%d).", errno);
         goto out;
     }
     
@@ -604,7 +604,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
         res = fread(buf, 1, read_size, wad_fd);
         if (res != read_size)
         {
-            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes encrypted chunk from content offset 0x%" PRIx64 "!", read_size, offset);
+            ERROR_MSG("Failed to read 0x%" PRIx64 " bytes encrypted chunk from content offset 0x%" PRIx64 "! (%d).", read_size, offset, errno);
             goto out;
         }
         
@@ -622,7 +622,7 @@ static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *title
         res = fwrite(buf, 1, blksize, cnt_fd);
         if (res != blksize)
         {
-            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes decrypted chunk from content offset 0x%" PRIx64 "!", blksize, offset);
+            ERROR_MSG("Failed to write 0x%" PRIx64 " bytes decrypted chunk from content offset 0x%" PRIx64 "! (%d).", blksize, offset, errno);
             goto out;
         }
         

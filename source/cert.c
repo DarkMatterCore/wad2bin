@@ -56,7 +56,7 @@ bool certReadCertificateChainFromFile(FILE *fd, u64 cert_chain_size, Certificate
     res = fread(out_chain->raw_chain, 1, cert_chain_size, fd);
     if (res != cert_chain_size)
     {
-        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long raw certificate chain!", cert_chain_size);
+        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long raw certificate chain! (%d).", cert_chain_size, errno);
         goto out;
     }
     

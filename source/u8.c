@@ -48,7 +48,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     res = fread(&u8_header, 1, sizeof(U8Header), u8_fd);
     if (res != sizeof(U8Header))
     {
-        ERROR_MSG("Failed to read U8 header!");
+        ERROR_MSG("Failed to read U8 header! (%d).", errno);
         return false;
     }
     
@@ -70,7 +70,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     res = fread(&root_node, 1, sizeof(U8Node), u8_fd);
     if (res != sizeof(U8Node))
     {
-        ERROR_MSG("Failed to read root U8 node!");
+        ERROR_MSG("Failed to read root U8 node! (%d).", errno);
         return false;
     }
     
@@ -114,7 +114,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     res = fread(nodes + 1, 1, sizeof(U8Node) * (node_count - 1), u8_fd);
     if (res != (sizeof(U8Node) * (node_count - 1)))
     {
-        ERROR_MSG("Failed to read U8 nodes!");
+        ERROR_MSG("Failed to read U8 nodes! (%d).", errno);
         goto out;
     }
     
@@ -130,7 +130,7 @@ bool u8ContextInit(FILE *u8_fd, U8Context *ctx)
     res = fread(str_table, 1, str_table_size, u8_fd);
     if (res != str_table_size)
     {
-        ERROR_MSG("Failed to read U8 string table!");
+        ERROR_MSG("Failed to read U8 string table! (%d).", errno);
         goto out;
     }
     
@@ -356,7 +356,7 @@ u8 *u8LoadFileData(U8Context *ctx, U8Node *file_node, u64 *out_size)
     {
         *out_size = file_node->size;
     } else {
-        ERROR_MSG("Failed to read file data from U8 node!");
+        ERROR_MSG("Failed to read file data from U8 node! (%d).", errno);
         free(buf);
         buf = NULL;
     }

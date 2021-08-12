@@ -22,7 +22,7 @@
 #include "utils.h"
 #include "ConvertUTF.h"
 
-void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...)
+PRINTF_FORMAT(2, 3) void utilsPrintErrorMessage(const char *func_name, const char *fmt, ...)
 {
     va_list args;
     
@@ -81,7 +81,7 @@ bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, u64 expected_s
     fd = os_fopen(file_path, OS_MODE_READ);
     if (!fd)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode!", file_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in read mode! (%d).", file_path, errno);
         return false;
     }
     
@@ -101,7 +101,7 @@ bool utilsReadDataFromFile(const os_char_t *file_path, void *buf, u64 expected_s
     res = fread(buf, 1, expected_size, fd);
     if (res != expected_size)
     {
-        ERROR_MSG("Unable to read 0x%" PRIx64 " bytes block from \"" OS_PRINT_STR "\"!", expected_size, file_path);
+        ERROR_MSG("Unable to read 0x%" PRIx64 " bytes block from \"" OS_PRINT_STR "\"! (%d).", expected_size, file_path, errno);
         goto out;
     }
     
@@ -129,7 +129,7 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, u64 size)
     fd = os_fopen(out_path, OS_MODE_WRITE);
     if (!fd)
     {
-        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode!", out_path);
+        ERROR_MSG("Failed to open \"" OS_PRINT_STR "\" in write mode! (%d).", out_path, errno);
         return false;
     }
     
@@ -137,7 +137,7 @@ bool utilsWriteDataToFile(const os_char_t *out_path, const void *buf, u64 size)
     res = fwrite(buf, 1, size, fd);
     if (res != size)
     {
-        ERROR_MSG("Failed to write 0x%" PRIx64 " bytes block to \"" OS_PRINT_STR "\"!", size, out_path);
+        ERROR_MSG("Failed to write 0x%" PRIx64 " bytes block to \"" OS_PRINT_STR "\"! (%d).", size, out_path, errno);
         success = false;
     }
     
@@ -193,7 +193,7 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)
     /* Open directory. */
     if (!(dir = os_opendir(dir_path)))
     {
-        ERROR_MSG("Error opening directory \"" OS_PRINT_STR "\"!", dir_path);
+        ERROR_MSG("Error opening directory \"" OS_PRINT_STR "\"! (%d).", dir_path, errno);
         return false;
     }
     
@@ -220,7 +220,7 @@ bool utilsRemoveDirectoryRecursively(const os_char_t *dir_path)
         /* Get entry status */
         if (os_stat(name_buf, &st) < 0)
         {
-            ERROR_MSG("Failed to get entry status for \"" OS_PRINT_STR "\"!", name_buf);
+            ERROR_MSG("Failed to get entry status for \"" OS_PRINT_STR "\"! (%d).", name_buf, errno);
             success = false;
             break;
         }

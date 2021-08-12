@@ -50,7 +50,7 @@ bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, Certif
     res = fread(out_ticket->data, 1, ticket_size, fd);
     if (res != ticket_size)
     {
-        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long ticket!", ticket_size);
+        ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long ticket! (%d).", ticket_size, errno);
         goto out;
     }
     
