@@ -1,7 +1,7 @@
 /*
  * tik.c
  *
- * Copyright (c) 2020, DarkMatterCore <pabloacurielz@gmail.com>.
+ * Copyright (c) 2020-2025, DarkMatterCore <pabloacurielz@gmail.com>.
  *
  * This file is part of wad2bin (https://github.com/DarkMatterCore/wad2bin).
  *
@@ -31,13 +31,13 @@ bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, Certif
         ERROR_MSG("Invalid parameters!");
         return false;
     }
-    
+
     u64 res = 0;
     bool success = false;
-    
+
     /* Cleanup output ticket. */
     memset(out_ticket, 0, sizeof(Ticket));
-    
+
     /* Allocate memory for the output ticket. */
     out_ticket->data = (u8*)calloc(ALIGN_UP(ticket_size, WAD_BLOCK_SIZE), sizeof(u8));
     if (!out_ticket->data)
@@ -45,7 +45,7 @@ bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, Certif
         ERROR_MSG("Error allocating memory for the ticket!");
         return false;
     }
-    
+
     /* Read ticket. */
     res = fread(out_ticket->data, 1, ticket_size, fd);
     if (res != ticket_size)
@@ -53,65 +53,65 @@ bool tikReadTicketFromFile(FILE *fd, u64 ticket_size, Ticket *out_ticket, Certif
         ERROR_MSG("Failed to read 0x%" PRIx64 " bytes long ticket! (%d).", ticket_size, errno);
         goto out;
     }
-    
+
     /* Check if the ticket size is valid. */
     if (!tikGetTicketTypeAndSize(out_ticket->data, ticket_size, &(out_ticket->type), &(out_ticket->size))) goto out;
-    
+
     if (ticket_size != out_ticket->size)
     {
         printf("\n");
         ERROR_MSG("Calculated ticket size doesn't match input size! (0x%" PRIx64 " != 0x%" PRIx64 ").", out_ticket->size, ticket_size);
         goto out;
     }
-    
+
     /* Verify ticket signature. */
     if (!certVerifySignatureFromSignedPayload(chain, out_ticket->data, out_ticket->size, &(out_ticket->valid_sig)))
     {
         ERROR_MSG("Failed to verify ticket signature!");
         goto out;
     }
-    
+
     success = true;
-    
+
 out:
     if (!success) tikFreeTicket(out_ticket);
-    
+
     return success;
 }
 
 void tikFakesignTicket(Ticket *ticket)
 {
     TikCommonBlock *tik_common_block = NULL;
-    
+
     u32 sig_type = 0;
     u8 *signature = NULL;
     u64 signature_size = 0;
-    
+
     u8 hash[SHA256_HASH_SIZE] = {0};
     u16 *padding = NULL;
-    
+
     if (!ticket || ticket->type == TikType_None || ticket->type > TikType_SigHmac160 || ticket->size < SIGNED_TIK_MIN_SIZE || ticket->size > SIGNED_TIK_MAX_SIZE || \
         !(tik_common_block = tikGetCommonBlock(ticket->data))) return;
-    
+
     /* Wipe signature. */
     sig_type = signatureGetSigType(ticket->data);
     signature = signatureGetSig(ticket->data);
     signature_size = signatureGetSigSize(sig_type);
     memset(signature, 0, signature_size);
-    
+
     /* Wipe ECDH data and console ID. */
     memset(tik_common_block->ecdh_data, 0, sizeof(tik_common_block->ecdh_data));
     tik_common_block->console_id = 0;
-    
+
     /* Modify ticket until we get a hash that starts with 0x00. */
     /* Return right away if we're dealing with a HMAC signature. */
     if (sig_type == SignatureType_Hmac160Sha1) return;
-    
+
     padding = (u16*)tik_common_block->reserved_3;
     for(u16 i = 0; i < 65535; i++)
     {
         *padding = bswap_16(i);
-        
+
         switch(sig_type)
         {
             case SignatureType_Rsa4096Sha1:
@@ -127,10 +127,10 @@ void tikFakesignTicket(Ticket *ticket)
             default:
                 break;
         }
-        
+
         if (hash[0] == 0) break;
     }
-    
+
     /* Update signature validity. */
     ticket->valid_sig = false;
 }
@@ -141,29 +141,29 @@ static bool tikGetTicketTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *
     u32 sig_type = 0;
     u64 signed_ticket_size = 0;
     u8 type = TikType_None;
-    
+
     if (!buf || buf_size < SIGNED_TIK_MIN_SIZE || (!out_type && !out_size))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
-    
+
     if (!(tik_common_block = tikGetCommonBlock(buf)) || !(signed_ticket_size = tikGetSignedTicketSize(buf)))
     {
         printf("\n");
         ERROR_MSG("Input buffer doesn't hold a valid signed ticket!");
         return false;
     }
-    
+
     if (signed_ticket_size > buf_size)
     {
         printf("\n");
         ERROR_MSG("Calculated signed ticket size exceeds input buffer size! (0x%" PRIx64 " > 0x%" PRIx64 ").", signed_ticket_size, buf_size);
         return false;
     }
-    
+
     sig_type = signatureGetSigType(buf);
-    
+
     printf("  Signature type:         0x%08" PRIx32, sig_type);
     switch(sig_type)
     {
@@ -190,11 +190,11 @@ static bool tikGetTicketTypeAndSize(void *buf, u64 buf_size, u8 *out_type, u64 *
             break;
     }
     printf(".\n");
-    
-    printf("  Signature issuer:       %.*s.\n", (int)sizeof(tik_common_block->issuer), tik_common_block->issuer);
-    
+
+    printf("  Signature issuer:       \"%.*s\".\n", (int)sizeof(tik_common_block->issuer), tik_common_block->issuer);
+
     if (out_type) *out_type = type;
     if (out_size) *out_size = signed_ticket_size;
-    
+
     return true;
 }

@@ -130,6 +130,7 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
     FILE *opening_bnr = NULL;
     u8 *icon_bin = NULL;
     u64 res = 0, icon_bin_size = 0;
+    bool build_info_available = true;
 
     BinContentHeader cntbin_header = {0};
     u8 imet_hash[MD5_HASH_SIZE] = {0}, calc_imet_hash[MD5_HASH_SIZE] = {0}, cntbin_header_hash[MD5_HASH_SIZE] = {0};
@@ -190,13 +191,39 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         goto out;
     }
 
+    /* Check if we're dealing with an IMET header without build info (like the ones from disc-based games). */
+    if (*((u32*)cntbin_header.imet_header.padding_1) == bswap_32(IMET_MAGIC))
+    {
+        memmove(((u8*)&cntbin_header) + 0x40, &cntbin_header, sizeof(BinContentHeader) - 0x40);
+        memset(&cntbin_header, 0, 0x40);
+        fseek(opening_bnr, -0x40, SEEK_CUR);
+        build_info_available = false;
+    }
+
     /* Copy IMET hash and wipe it from the IMET header. */
-    /* The IMET header from content.bin files doesn't have this hash. */
+    /* IMET headers from content.bin files don't have this hash. */
     memcpy(imet_hash, cntbin_header.imet_header.hash, MD5_HASH_SIZE);
     memset(cntbin_header.imet_header.hash, 0, MD5_HASH_SIZE);
 
     /* Calculate IMET hash. */
     mbedtls_md5((u8*)&cntbin_header.imet_header, sizeof(BinContentImetHeader), calc_imet_hash);
+
+    /* Print IMET information. */
+    printf("IMET header:\n");
+    printf("  icon.bin size:          0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.icon_bin_size));
+    printf("  banner.bin size:        0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.banner_bin_size));
+    printf("  sound.bin size:         0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.sound_bin_size));
+    utilsPrintHexData("  Hash:                   ", imet_hash, MD5_HASH_SIZE);
+    utilsPrintUTF16BEString("  Title name:             ", cntbin_header.imet_header.names[1], IMET_NAME_LENGTH);
+
+    if (build_info_available)
+    {
+        printf("  Build name:             \"%.*s\".\n", 0x30, (char*)&(cntbin_header));
+        printf("  Builder:                \"%.*s\".\n\n", 0x10, (char*)&(cntbin_header) + 0x30);
+    } else {
+        printf("  Build name:             N/A.\n");
+        printf("  Builder:                N/A.\n\n");
+    }
 
     /* Check IMET header fields. */
     if (cntbin_header.imet_header.magic != bswap_32(IMET_MAGIC) || cntbin_header.imet_header.hash_size != bswap_32(IMET_HASHED_AREA_SIZE) || \
@@ -206,16 +233,6 @@ bool binGenerateContentBinFromUnpackedInstallableWadPackage(os_char_t *unpacked_
         ERROR_MSG("Invalid IMET header in \"" OS_PRINT_STR "\"!", unpacked_wad_path);
         goto out;
     }
-
-    /* Print IMET information. */
-    printf("IMET header:\n");
-    printf("  icon.bin size:          0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.icon_bin_size));
-    printf("  banner.bin size:        0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.banner_bin_size));
-    printf("  sound.bin size:         0x%" PRIx32 " (decompressed).\n", bswap_32(cntbin_header.imet_header.sound_bin_size));
-    utilsPrintHexData("  Hash:                   ", imet_hash, MD5_HASH_SIZE);
-    utilsPrintUTF16BEString("  Title name:             ", cntbin_header.imet_header.names[1], IMET_NAME_LENGTH);
-    printf("  Build name:             %.*s.\n", 0x30, (char*)&(cntbin_header));
-    printf("  Builder:                %.*s.\n\n", 0x10, (char*)&(cntbin_header) + 0x30);
 
     /* Load icon.bin file from 00000000.app U8 archive. */
     icon_bin = u8LoadFileDataFromU8ArchiveByPath(opening_bnr, "/meta/icon.bin", &icon_bin_size);
