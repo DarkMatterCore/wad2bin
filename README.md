@@ -162,6 +162,7 @@ Changelog:
 
 * bin: add support for the new `--skip-bins` option, which will completely skip .bin file generation if a file is already available at the expected output path. Applies to both `content.bin` (regular) and `<index>.bin` (DLC) conversion procedures.
 * bin: add support for two custom Rock Band 2 DLC generations: `00010005-735A47xx` (`sZGx`) and `00010005-735A48xx` (`sZHx`).
+* bin: add support for `opening.bnr` / `00000000.app` files without a build info area (e.g. like the ones from disc-based games). Fixes conversion for WiiGSC forwarders.
 * os: add `os_is_big_endian()`, which retrieves the system endianness if it hasn't been retrieved yet and returns its value. Replaces previous `IS_BIG_ENDIAN` macro.
 * os: update Windows-specific `os_snprintf()` to properly allocate memory for a fully formatted string before copying its contents to the output buffer.
 * Makefile: generate and define a UTC timestamp at build time instead of using the `__TIME__` and `__DATE__` macros.
